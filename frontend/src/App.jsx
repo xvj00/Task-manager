@@ -1,0 +1,36 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import AppLayout from './components/layout/AppLayout';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import DashboardPage from './pages/DashboardPage';
+import TasksPage from './pages/TasksPage';
+import TaskDetailPage from './pages/TaskDetailPage';
+import CreateEditTaskPage from './pages/CreateEditTaskPage';
+import BalancePage from './pages/BalancePage';
+import PrizesPage from './pages/PrizesPage';
+import LeaderboardPage from './pages/LeaderboardPage';
+import AdminPage from './pages/AdminPage';
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
+      <Routes>
+        <Route path="/login"    element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route element={<AppLayout />}>
+          <Route path="/"              element={<DashboardPage />} />
+          <Route path="/tasks"         element={<TasksPage />} />
+          <Route path="/tasks/new"     element={<CreateEditTaskPage />} />
+          <Route path="/tasks/:id"     element={<TaskDetailPage />} />
+          <Route path="/tasks/:id/edit" element={<CreateEditTaskPage />} />
+          <Route path="/balance"       element={<BalancePage />} />
+          <Route path="/prizes"        element={<PrizesPage />} />
+          <Route path="/leaderboard"   element={<LeaderboardPage />} />
+          <Route path="/admin"         element={<AdminPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}

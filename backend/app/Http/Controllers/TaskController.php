@@ -1,0 +1,257 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Notification;
+use App\Models\Task;
+use App\Models\TaskLog;
+use App\Models\Transaction;
+use App\Models\User;
+use Illuminate\Http\Request;
+
+class TaskController extends Controller
+{
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        $query = Task::with(['creator', 'assignee']);
+
+        // Исполнитель видит только назначенные ему задачи и открытые
+        if (!$user->isCreator()) {
+            $query->where(function ($q) use ($user) {
+                $q->where('assignee_id', $user->id)->orWhere('status', 'open');
+            });
+        }
+
+        if ($request->filled('status'))   $query->where('status', $request->status);
+        if ($request->filled('priority')) $query->where('priority', $request->priority);
+        if ($request->filled('assignee_id')) $query->where('assignee_id', $request->assignee_id);
+        if ($request->filled('category')) $query->where('category', $request->category);
+        if ($request->filled('search'))   $query->where(function ($q) use ($request) {
+            $q->where('title', 'like', "%{$request->search}%")
+              ->orWhere('description', 'like', "%{$request->search}%");
+        });
+
+        $sort = $request->get('sort', 'created_at');
+        $dir  = $request->get('dir', 'desc');
+        $allowed = ['created_at', 'deadline', 'priority', 'reward_points'];
+        if (in_array($sort, $allowed)) $query->orderBy($sort, $dir);
+
+        return response()->json($query->get());
+    }
+
+    public function store(Request $request)
+    {
+        $this->requireCreator($request);
+
+        $data = $request->validate([
+            'title'         => 'required|string|max:150',
+            'description'   => 'nullable|string',
+            'deadline'      => 'nullable|date',
+            'priority'      => 'nullable|in:low,medium,high,urgent',
+            'assignee_id'   => 'nullable|exists:users,id',
+            'reward_points' => 'nullable|integer|min:0',
+            'category'      => 'nullable|string|max:100',
+        ]);
+
+        $task = Task::create([...$data, 'creator_id' => $request->user()->id]);
+
+        TaskLog::create([
+            'task_id'    => $task->id,
+            'user_id'    => $request->user()->id,
+            'old_status' => null,
+            'new_status' => 'open',
+            'comment'    => 'Задача создана',
+        ]);
+
+        if (!empty($data['assignee_id'])) {
+            $this->notify($data['assignee_id'], 'task_assigned', [
+                'task_id'    => $task->id,
+                'task_title' => $task->title,
+            ]);
+        }
+
+        return response()->json($task->load('creator', 'assignee'), 201);
+    }
+
+    public function show(Request $request, Task $task)
+    {
+        $user = $request->user();
+        if (!$user->isCreator() && $task->assignee_id !== $user->id && $task->status !== 'open') {
+            abort(403);
+        }
+        return response()->json($task->load('creator', 'assignee', 'logs.user'));
+    }
+
+    public function update(Request $request, Task $task)
+    {
+        $this->requireCreator($request);
+
+        $data = $request->validate([
+            'title'         => 'sometimes|string|max:150',
+            'description'   => 'nullable|string',
+            'deadline'      => 'nullable|date',
+            'priority'      => 'nullable|in:low,medium,high,urgent',
+            'assignee_id'   => 'nullable|exists:users,id',
+            'reward_points' => 'nullable|integer|min:0',
+            'category'      => 'nullable|string|max:100',
+        ]);
+
+        $oldAssignee = $task->assignee_id;
+        $task->update($data);
+
+        if (isset($data['assignee_id']) && $data['assignee_id'] !== $oldAssignee && $data['assignee_id']) {
+            $this->notify($data['assignee_id'], 'task_assigned', [
+                'task_id' => $task->id, 'task_title' => $task->title,
+            ]);
+        }
+
+        return response()->json($task->load('creator', 'assignee'));
+    }
+
+    public function destroy(Request $request, Task $task)
+    {
+        $this->requireCreator($request);
+        $task->delete();
+        return response()->json(null, 204);
+    }
+
+    // Взять задачу в работу (исполнитель)
+    public function take(Request $request, Task $task)
+    {
+        $user = $request->user();
+        if ($task->status !== 'open') abort(422, 'Задача не в статусе "Открыта".');
+
+        $oldStatus = $task->status;
+        $task->update(['status' => 'in_progress', 'assignee_id' => $user->id]);
+
+        TaskLog::create([
+            'task_id' => $task->id, 'user_id' => $user->id,
+            'old_status' => $oldStatus, 'new_status' => 'in_progress',
+            'comment' => "{$user->name} взял задачу в работу",
+        ]);
+
+        // Уведомить создателя
+        $this->notify($task->creator_id, 'task_taken', [
+            'task_id' => $task->id, 'task_title' => $task->title, 'executor' => $user->name,
+        ]);
+
+        return response()->json($task->load('creator', 'assignee'));
+    }
+
+    // Отметить как выполненную (исполнитель → на проверку)
+    public function submit(Request $request, Task $task)
+    {
+        $user = $request->user();
+        if ($task->assignee_id !== $user->id) abort(403);
+        if ($task->status !== 'in_progress') abort(422, 'Задача не в процессе.');
+
+        $oldStatus = $task->status;
+        $task->update(['status' => 'review']);
+
+        TaskLog::create([
+            'task_id' => $task->id, 'user_id' => $user->id,
+            'old_status' => $oldStatus, 'new_status' => 'review',
+            'comment' => 'Исполнитель отметил задачу выполненной',
+        ]);
+
+        // Уведомить создателя
+        $this->notify($task->creator_id, 'task_review', [
+            'task_id' => $task->id, 'task_title' => $task->title,
+        ]);
+
+        return response()->json($task->load('creator', 'assignee'));
+    }
+
+    // Подтвердить выполнение (создатель)
+    public function approve(Request $request, Task $task)
+    {
+        $this->requireCreator($request);
+        if ($task->status !== 'review') abort(422, 'Задача не на проверке.');
+
+        $data = $request->validate(['reward_points' => 'nullable|integer|min:0']);
+        $points = $data['reward_points'] ?? $task->reward_points;
+
+        $task->update(['status' => 'done', 'reward_points' => $points]);
+
+        TaskLog::create([
+            'task_id' => $task->id, 'user_id' => $request->user()->id,
+            'old_status' => 'review', 'new_status' => 'done',
+            'comment' => "Подтверждено. Начислено {$points} баллов.",
+        ]);
+
+        // Начислить баллы
+        if ($task->assignee_id && $points > 0) {
+            $assignee = User::find($task->assignee_id);
+            $assignee->increment('balance', $points);
+
+            Transaction::create([
+                'user_id'     => $task->assignee_id,
+                'amount'      => $points,
+                'type'        => 'credit',
+                'description' => "Задача выполнена: «{$task->title}»",
+                'task_id'     => $task->id,
+                'created_by'  => $request->user()->id,
+            ]);
+
+            $this->notify($task->assignee_id, 'task_approved', [
+                'task_id'    => $task->id,
+                'task_title' => $task->title,
+                'points'     => $points,
+            ]);
+        }
+
+        return response()->json($task->load('creator', 'assignee'));
+    }
+
+    // Отклонить (создатель)
+    public function reject(Request $request, Task $task)
+    {
+        $this->requireCreator($request);
+        if ($task->status !== 'review') abort(422, 'Задача не на проверке.');
+
+        $data = $request->validate(['reason' => 'nullable|string']);
+
+        $task->update(['status' => 'in_progress', 'rejection_reason' => $data['reason'] ?? null]);
+
+        TaskLog::create([
+            'task_id' => $task->id, 'user_id' => $request->user()->id,
+            'old_status' => 'review', 'new_status' => 'in_progress',
+            'comment' => 'Отклонено. ' . ($data['reason'] ?? ''),
+        ]);
+
+        if ($task->assignee_id) {
+            $this->notify($task->assignee_id, 'task_rejected', [
+                'task_id' => $task->id, 'task_title' => $task->title,
+                'reason'  => $data['reason'] ?? '',
+            ]);
+        }
+
+        return response()->json($task->load('creator', 'assignee'));
+    }
+
+    // Архивировать
+    public function archive(Request $request, Task $task)
+    {
+        $this->requireCreator($request);
+        $old = $task->status;
+        $task->update(['status' => 'archive']);
+
+        TaskLog::create([
+            'task_id' => $task->id, 'user_id' => $request->user()->id,
+            'old_status' => $old, 'new_status' => 'archive', 'comment' => 'Задача архивирована',
+        ]);
+
+        return response()->json($task);
+    }
+
+    private function requireCreator(Request $request)
+    {
+        if (!$request->user()->isCreator()) abort(403, 'Только создатель может выполнить это действие.');
+    }
+
+    private function notify(int $userId, string $type, array $data)
+    {
+        Notification::create(['user_id' => $userId, 'type' => $type, 'data' => $data]);
+    }
+}

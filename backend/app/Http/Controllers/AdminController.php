@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Task;
+use App\Models\Transaction;
+use App\Models\User;
+use Illuminate\Http\Request;
+
+class AdminController extends Controller
+{
+    public function stats()
+    {
+        return response()->json([
+            'users'         => User::where('role', 'executor')->count(),
+            'tasks_total'   => Task::count(),
+            'tasks_review'  => Task::where('status', 'review')->count(),
+            'tasks_done'    => Task::where('status', 'done')->count(),
+            'points_issued' => Transaction::where('type', 'credit')->sum('amount'),
+        ]);
+    }
+
+    public function users(Request $request)
+    {
+        if (!$request->user()->isCreator()) abort(403);
+
+        return response()->json(
+            User::withCount([
+                'tasks as completed_tasks' => fn($q) => $q->where('status', 'done'),
+            ])->get()
+        );
+    }
+
+    public function updateUser(Request $request, User $user)
+    {
+        if (!$request->user()->isCreator()) abort(403);
+
+        $data = $request->validate([
+            'name'  => 'sometimes|string|max:255',
+            'role'  => 'sometimes|in:creator,executor',
+            'email' => 'sometimes|email|unique:users,email,' . $user->id,
+        ]);
+
+        $user->update($data);
+        return response()->json($user);
+    }
+
+    public function destroyUser(Request $request, User $user)
+    {
+        if (!$request->user()->isCreator()) abort(403);
+        if ($user->id === $request->user()->id) abort(422, 'Нельзя удалить себя.');
+        $user->delete();
+        return response()->json(null, 204);
+    }
+}
