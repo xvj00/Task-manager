@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ManualTransactionRequest;
 use App\Models\Notification;
 use App\Models\Transaction;
 use App\Models\User;
@@ -28,16 +29,11 @@ class TransactionController extends Controller
     }
 
     // Ручное начисление/списание (создатель)
-    public function manual(Request $request)
+    public function manual(ManualTransactionRequest $request)
     {
         if (!$request->user()->isCreator()) abort(403);
 
-        $data = $request->validate([
-            'user_id'     => 'required|exists:users,id',
-            'amount'      => 'required|integer|min:1',
-            'type'        => 'required|in:credit,debit',
-            'description' => 'required|string|max:255',
-        ]);
+        $data = $request->validated();
 
         $target = User::findOrFail($data['user_id']);
         $signed = $data['type'] === 'credit' ? $data['amount'] : -$data['amount'];

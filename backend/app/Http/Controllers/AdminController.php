@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateUserRequest;
 use App\Models\Task;
 use App\Models\Transaction;
 use App\Models\User;
@@ -31,17 +32,11 @@ class AdminController extends Controller
         );
     }
 
-    public function updateUser(Request $request, User $user)
+    public function updateUser(UpdateUserRequest $request, User $user)
     {
         if (!$request->user()->isCreator()) abort(403);
 
-        $data = $request->validate([
-            'name'  => 'sometimes|string|max:255',
-            'role'  => 'sometimes|in:creator,executor',
-            'email' => 'sometimes|email|unique:users,email,' . $user->id,
-        ]);
-
-        $user->update($data);
+        $user->update($request->validated());
         return response()->json($user);
     }
 

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\HandlePrizeRequestRequest;
+use App\Http\Requests\StorePrizeRequest;
+use App\Http\Requests\UpdatePrizeRequest;
 use App\Models\Notification;
 use App\Models\Prize;
 use App\Models\PrizeRequest;
@@ -15,34 +18,20 @@ class PrizeController extends Controller
         return response()->json(Prize::where('is_active', true)->with('creator')->get());
     }
 
-    public function store(Request $request)
+    public function store(StorePrizeRequest $request)
     {
         if (!$request->user()->isCreator()) abort(403);
 
-        $data = $request->validate([
-            'name'        => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'cost_points' => 'required|integer|min:1',
-            'quantity'    => 'nullable|integer|min:-1',
-        ]);
-
+        $data  = $request->validated();
         $prize = Prize::create([...$data, 'created_by' => $request->user()->id]);
         return response()->json($prize, 201);
     }
 
-    public function update(Request $request, Prize $prize)
+    public function update(UpdatePrizeRequest $request, Prize $prize)
     {
         if (!$request->user()->isCreator()) abort(403);
 
-        $data = $request->validate([
-            'name'        => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-            'cost_points' => 'sometimes|integer|min:1',
-            'quantity'    => 'nullable|integer|min:-1',
-            'is_active'   => 'sometimes|boolean',
-        ]);
-
-        $prize->update($data);
+        $prize->update($request->validated());
         return response()->json($prize);
     }
 
@@ -104,14 +93,11 @@ class PrizeController extends Controller
     }
 
     // Подтвердить/отклонить запрос (создатель)
-    public function handleRequest(Request $request, PrizeRequest $prizeRequest)
+    public function handleRequest(HandlePrizeRequestRequest $request, PrizeRequest $prizeRequest)
     {
         if (!$request->user()->isCreator()) abort(403);
 
-        $data = $request->validate([
-            'action' => 'required|in:approve,reject',
-            'reason' => 'nullable|string',
-        ]);
+        $data = $request->validated();
 
         if ($data['action'] === 'approve') {
             $user  = $prizeRequest->user;

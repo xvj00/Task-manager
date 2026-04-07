@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ApproveTaskRequest;
+use App\Http\Requests\RejectTaskRequest;
+use App\Http\Requests\StoreTaskRequest;
+use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Notification;
 use App\Models\Task;
 use App\Models\TaskLog;
@@ -40,19 +44,11 @@ class TaskController extends Controller
         return response()->json($query->get());
     }
 
-    public function store(Request $request)
+    public function store(StoreTaskRequest $request)
     {
         $this->requireCreator($request);
 
-        $data = $request->validate([
-            'title'         => 'required|string|max:150',
-            'description'   => 'nullable|string',
-            'deadline'      => 'nullable|date',
-            'priority'      => 'nullable|in:low,medium,high,urgent',
-            'assignee_id'   => 'nullable|exists:users,id',
-            'reward_points' => 'nullable|integer|min:0',
-            'category'      => 'nullable|string|max:100',
-        ]);
+        $data = $request->validated();
 
         $task = Task::create([...$data, 'creator_id' => $request->user()->id]);
 
@@ -83,20 +79,11 @@ class TaskController extends Controller
         return response()->json($task->load('creator', 'assignee', 'logs.user'));
     }
 
-    public function update(Request $request, Task $task)
+    public function update(UpdateTaskRequest $request, Task $task)
     {
         $this->requireCreator($request);
 
-        $data = $request->validate([
-            'title'         => 'sometimes|string|max:150',
-            'description'   => 'nullable|string',
-            'deadline'      => 'nullable|date',
-            'priority'      => 'nullable|in:low,medium,high,urgent',
-            'assignee_id'   => 'nullable|exists:users,id',
-            'reward_points' => 'nullable|integer|min:0',
-            'category'      => 'nullable|string|max:100',
-        ]);
-
+        $data        = $request->validated();
         $oldAssignee = $task->assignee_id;
         $task->update($data);
 
@@ -164,12 +151,12 @@ class TaskController extends Controller
     }
 
     // Подтвердить выполнение (создатель)
-    public function approve(Request $request, Task $task)
+    public function approve(ApproveTaskRequest $request, Task $task)
     {
         $this->requireCreator($request);
         if ($task->status !== 'review') abort(422, 'Задача не на проверке.');
 
-        $data = $request->validate(['reward_points' => 'nullable|integer|min:0']);
+        $data   = $request->validated();
         $points = $data['reward_points'] ?? $task->reward_points;
 
         $task->update(['status' => 'done', 'reward_points' => $points]);
@@ -205,12 +192,12 @@ class TaskController extends Controller
     }
 
     // Отклонить (создатель)
-    public function reject(Request $request, Task $task)
+    public function reject(RejectTaskRequest $request, Task $task)
     {
         $this->requireCreator($request);
         if ($task->status !== 'review') abort(422, 'Задача не на проверке.');
 
-        $data = $request->validate(['reason' => 'nullable|string']);
+        $data = $request->validated();
 
         $task->update(['status' => 'in_progress', 'rejection_reason' => $data['reason'] ?? null]);
 

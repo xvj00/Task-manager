@@ -2,20 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\LoginRequest;
+use App\Http\Requests\RegisterRequest;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function register(Request $request)
+    public function register(RegisterRequest $request)
     {
-        $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users',
-            'password' => 'required|string|min:6|confirmed',
-        ]);
+        $data = $request->validated();
 
         // Первый пользователь становится создателем
         $role = User::count() === 0 ? 'creator' : 'executor';
@@ -25,10 +22,8 @@ class AuthController extends Controller
         return response()->json(['user' => $user, 'token' => $token], 201);
     }
 
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate(['email' => 'required|email', 'password' => 'required']);
-
         if (!Auth::attempt($request->only('email', 'password'))) {
             throw ValidationException::withMessages(['email' => ['Неверный email или пароль.']]);
         }
@@ -39,13 +34,13 @@ class AuthController extends Controller
         return response()->json(['user' => $user, 'token' => $token]);
     }
 
-    public function logout(Request $request)
+    public function logout(\Illuminate\Http\Request $request)
     {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Выход выполнен.']);
     }
 
-    public function me(Request $request)
+    public function me(\Illuminate\Http\Request $request)
     {
         return response()->json($request->user());
     }
