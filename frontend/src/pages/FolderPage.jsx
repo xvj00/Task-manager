@@ -9,7 +9,7 @@ export default function FolderPage() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [folder, setFolder] = useState(null);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteUsername, setInviteUsername] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
   const [showInvite, setShowInvite] = useState(false);
 
@@ -19,9 +19,9 @@ export default function FolderPage() {
   const handleInvite = async (e) => {
     e.preventDefault();
     try {
-      await api.post(`/folders/${id}/invite`, { email: inviteEmail, role: inviteRole });
+      await api.post(`/folders/${id}/invite`, { username: inviteUsername, role: inviteRole });
       toast.success('Пользователь приглашён');
-      setInviteEmail(''); setShowInvite(false); load();
+      setInviteUsername(''); setShowInvite(false); load();
     } catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
   };
 
@@ -37,7 +37,7 @@ export default function FolderPage() {
   };
 
   if (!folder) return <div className="loading">Загрузка...</div>;
-  const isOwner = folder.owner_id === user?.id || user?.role === 'creator';
+  const isOwner = folder.owner_id === user?.id || user?.role === 'admin';
 
   return (
     <div className="page page-narrow-lg">
@@ -65,8 +65,8 @@ export default function FolderPage() {
           <h3>Пригласить в папку</h3>
           <div className="form-row">
             <div className="form-group">
-              <label>Email пользователя</label>
-              <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} required placeholder="user@example.com" />
+              <label>Юзернейм пользователя</label>
+              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} required placeholder="@username" />
             </div>
             <div className="form-group">
               <label>Роль</label>

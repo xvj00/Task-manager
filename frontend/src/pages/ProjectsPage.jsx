@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
 export default function ProjectsPage() {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [folders, setFolders] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -20,11 +21,9 @@ export default function ProjectsPage() {
     const payload = { ...form };
     if (!payload.folder_id) delete payload.folder_id;
     try {
-      await api.post('/projects', payload);
+      const r = await api.post('/projects', payload);
       toast.success('Проект создан');
-      setShowForm(false);
-      setForm({ name: '', description: '', folder_id: '' });
-      load();
+      navigate(`/projects/${r.data.id}`);
     } catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
   };
 

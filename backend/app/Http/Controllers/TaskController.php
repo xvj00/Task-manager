@@ -46,7 +46,7 @@ class TaskController extends Controller
 
     public function store(StoreTaskRequest $request)
     {
-        $this->requireCreator($request);
+        $this->requireTaskManager($request, $request->input('project_id'));
 
         $data = $request->validated();
 
@@ -73,15 +73,17 @@ class TaskController extends Controller
     public function show(Request $request, Task $task)
     {
         $user = $request->user();
-        if (!$user->isCreator() && $task->assignee_id !== $user->id && $task->status !== 'open') {
-            abort(403);
-        }
+        $canView = $user->isAdmin()
+            || $task->assignee_id === $user->id
+            || $task->status === 'open'
+            || ($task->project_id && \App\Models\Project::find($task->project_id)?->members()->where('user_id', $user->id)->exists());
+        if (!$canView) abort(403);
         return response()->json($task->load('creator', 'assignee', 'logs.user'));
     }
 
     public function update(UpdateTaskRequest $request, Task $task)
     {
-        $this->requireCreator($request);
+        $this->requireTaskManager($request, $task->project_id);
 
         $data        = $request->validated();
         $oldAssignee = $task->assignee_id;
@@ -98,7 +100,7 @@ class TaskController extends Controller
 
     public function destroy(Request $request, Task $task)
     {
-        $this->requireCreator($request);
+        $this->requireTaskManager($request, $task->project_id);
         $task->delete();
         return response()->json(null, 204);
     }
@@ -153,7 +155,7 @@ class TaskController extends Controller
     // Подтвердить выполнение (создатель)
     public function approve(ApproveTaskRequest $request, Task $task)
     {
-        $this->requireCreator($request);
+        $this->requireTaskManager($request, $task->project_id);
         if ($task->status !== 'review') abort(422, 'Задача не на проверке.');
 
         $data   = $request->validated();
@@ -194,7 +196,7 @@ class TaskController extends Controller
     // Отклонить (создатель)
     public function reject(RejectTaskRequest $request, Task $task)
     {
-        $this->requireCreator($request);
+        $this->requireTaskManager($request, $task->project_id);
         if ($task->status !== 'review') abort(422, 'Задача не на проверке.');
 
         $data = $request->validated();
@@ -220,7 +222,7 @@ class TaskController extends Controller
     // Архивировать
     public function archive(Request $request, Task $task)
     {
-        $this->requireCreator($request);
+        $this->requireTaskManager($request, $task->project_id);
         $old = $task->status;
         $task->update(['status' => 'archive']);
 
@@ -232,9 +234,26 @@ class TaskController extends Controller
         return response()->json($task);
     }
 
-    private function requireCreator(Request $request)
+    /**
+     * Проверяет право управлять задачами:
+     * — глобальный admin всегда может
+     * — owner/editor проекта могут (если задача привязана к проекту)
+     * — иначе 403
+     */
+    private function requireTaskManager(Request $request, ?int $projectId = null): void
     {
-        if (!$request->user()->isCreator()) abort(403, 'Только создатель может выполнить это действие.');
+        $user = $request->user();
+        if ($user->isAdmin()) return;
+
+        if ($projectId) {
+            $project = \App\Models\Project::find($projectId);
+            if ($project) {
+                $role = $project->userRole($user->id);
+                if (in_array($role, ['owner', 'editor'])) return;
+            }
+        }
+
+        abort(403, 'Только владелец или редактор проекта может выполнить это действие.');
     }
 
     private function notify(int $userId, string $type, array $data)

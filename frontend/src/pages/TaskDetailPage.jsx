@@ -18,15 +18,26 @@ export default function TaskDetailPage() {
   const { id } = useParams();
   const { user } = useAuthStore();
   const navigate = useNavigate();
-  const [task, setTask] = useState(null);
+  const [task, setTask]           = useState(null);
+  const [project, setProject]     = useState(null);
   const [approvePoints, setApprovePoints] = useState('');
-  const [rejectReason, setRejectReason] = useState('');
-  const [showReject, setShowReject] = useState(false);
-  const [newSubtask, setNewSubtask] = useState('');
-  const [newComment, setNewComment] = useState('');
+  const [rejectReason, setRejectReason]   = useState('');
+  const [showReject, setShowReject]       = useState(false);
+  const [newSubtask, setNewSubtask]       = useState('');
+  const [newComment, setNewComment]       = useState('');
   const fileRef = useRef();
 
-  const load = () => api.get(`/tasks/${id}`).then(r => { setTask(r.data); setApprovePoints(r.data.reward_points); });
+  const load = async () => {
+    const r = await api.get(`/tasks/${id}`);
+    setTask(r.data);
+    setApprovePoints(r.data.reward_points);
+    // Загружаем проект чтобы знать роль текущего пользователя
+    if (r.data.project_id) {
+      api.get(`/projects/${r.data.project_id}`)
+        .then(pr => setProject(pr.data))
+        .catch(() => {});
+    }
+  };
   useEffect(() => { load(); }, [id]);
 
   const handleTake    = async () => { try { await api.post(`/tasks/${id}/take`);   toast.success('Взяли в работу!');        load(); } catch (e) { toast.error(e.response?.data?.message || 'Ошибка'); } };
@@ -60,16 +71,25 @@ export default function TaskDetailPage() {
   if (!task) return <div className="loading">Загрузка...</div>;
 
   const meta       = STATUS_META[task.status] || {};
-  const isCreator  = user?.role === 'creator';
   const isAssignee = task.assignee_id === user?.id;
   const doneCount  = task.subtasks?.filter(s => s.is_done).length ?? 0;
   const totalCount = task.subtasks?.length ?? 0;
+
+  // canManage: может создавать задачи, подтверждать, отклонять, архивировать
+  // — глобальный admin всегда
+  // — owner или editor проекта (если задача привязана к проекту)
+  // — создатель задачи (для задач без проекта)
+  const myProjectRole = project?.members?.find(m => m.id === user?.id)?.pivot?.role;
+  const isProjectManager = project
+    ? (project.owner_id === user?.id || myProjectRole === 'owner' || myProjectRole === 'editor')
+    : false;
+  const canManage = user?.role === 'admin' || isProjectManager || task.creator_id === user?.id;
 
   return (
     <div className="page page-narrow-lg">
       <div className="page-header">
         <button className="btn btn-ghost" onClick={() => navigate(task.project_id ? `/projects/${task.project_id}` : '/tasks')}>← Назад</button>
-        {isCreator && (
+        {canManage && (
           <div className="page-actions">
             <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/tasks/${id}/edit`)}>Редактировать</button>
             <button className="btn btn-secondary btn-sm" onClick={handleArchive}>🗄 Архив</button>
@@ -130,16 +150,20 @@ export default function TaskDetailPage() {
           </form>
         </div>
 
-        {/* Действия исполнителя */}
-        {!isCreator && (
+        {/* Действия исполнителя — видны всем кроме менеджеров проекта (если только они не сами исполнитель) */}
+        {(!canManage || isAssignee) && (
           <div className="task-actions">
-            {task.status === 'open' && <button className="btn btn-primary" onClick={handleTake}>🔄 Взять в работу</button>}
-            {task.status === 'in_progress' && isAssignee && <button className="btn btn-success" onClick={handleSubmit}>✅ Отметить выполненной</button>}
+            {task.status === 'open' && !isAssignee && !canManage && (
+              <button className="btn btn-primary" onClick={handleTake}>🔄 Взять в работу</button>
+            )}
+            {task.status === 'in_progress' && isAssignee && (
+              <button className="btn btn-success" onClick={handleSubmit}>✅ Отметить выполненной</button>
+            )}
           </div>
         )}
 
         {/* Подтверждение / отклонение */}
-        {isCreator && task.status === 'review' && (
+        {canManage && task.status === 'review' && (
           <div className="review-panel">
             <h3>Задача на проверке</h3>
             <div className="review-points">
@@ -191,7 +215,7 @@ export default function TaskDetailPage() {
                   <div className="comment-header">
                     <span className="comment-author">{c.user?.name}</span>
                     <span className="comment-date">{new Date(c.created_at).toLocaleString('ru-RU')}</span>
-                    {(c.user_id === user?.id || isCreator) && (
+                    {(c.user_id === user?.id || canManage) && (
                       <button className="comment-del" onClick={() => deleteComment(c.id)}>×</button>
                     )}
                   </div>

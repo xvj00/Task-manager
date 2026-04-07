@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Invitation;
 use App\Models\Notification;
 use App\Models\Project;
 use App\Models\User;
@@ -112,18 +113,37 @@ class ProjectController extends Controller
             abort(422, 'Пользователь уже является участником проекта.');
         }
 
-        $project->members()->attach($invitee->id, ['role' => $data['role']]);
+        // Проверяем, нет ли уже pending-приглашения
+        $exists = Invitation::where('type', 'project')
+            ->where('entity_id', $project->id)
+            ->where('invitee_id', $invitee->id)
+            ->where('status', 'pending')
+            ->exists();
+        if ($exists) abort(422, 'Приглашение уже отправлено, ожидается ответ.');
+
+        Invitation::create([
+            'type'       => 'project',
+            'entity_id'  => $project->id,
+            'inviter_id' => $request->user()->id,
+            'invitee_id' => $invitee->id,
+            'role'       => $data['role'],
+        ]);
 
         Notification::create([
             'user_id' => $invitee->id,
-            'type'    => 'project_invited',
-            'data'    => ['project_id' => $project->id, 'project_name' => $project->name],
+            'type'    => 'project_invite',
+            'data'    => [
+                'project_id'   => $project->id,
+                'project_name' => $project->name,
+                'inviter_name' => $request->user()->name,
+                'role'         => $data['role'],
+            ],
         ]);
 
-        return response()->json(['message' => "Пользователь @{$invitee->username} приглашён в проект."]);
+        return response()->json(['message' => "Приглашение отправлено пользователю @{$invitee->username}."]);
     }
 
-    // Получить/сбросить ссылку-приглашение
+    // Получить/изменить роль/сбросить ссылку-приглашение
     public function inviteLink(Request $request, Project $project)
     {
         $this->checkRole($request->user(), $project, ['owner', 'editor']);
@@ -133,7 +153,18 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Ссылка сброшена.']);
         }
 
-        return response()->json(['invite_token' => $project->invite_token]);
+        // Если передана роль — обновить роль ссылки
+        if ($request->filled('role')) {
+            $request->validate(['role' => 'in:editor,member'], [
+                'role.in' => 'Роль должна быть: editor или member.',
+            ]);
+            $project->update(['invite_link_role' => $request->role]);
+        }
+
+        return response()->json([
+            'invite_token'     => $project->invite_token,
+            'invite_link_role' => $project->invite_link_role,
+        ]);
     }
 
     // Вступить по ссылке-приглашению
@@ -146,7 +177,8 @@ class ProjectController extends Controller
             return response()->json(['message' => 'Вы уже участник этого проекта.', 'project' => $project]);
         }
 
-        $project->members()->attach($user->id, ['role' => 'member']);
+        $role = $project->invite_link_role ?? 'member';
+        $project->members()->attach($user->id, ['role' => $role]);
 
         Notification::create([
             'user_id' => $project->owner_id,

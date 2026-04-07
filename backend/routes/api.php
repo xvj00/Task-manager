@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FolderController;
+use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PrizeController;
@@ -89,6 +90,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get ('/notifications',           [NotificationController::class, 'index']);
     Route::post('/notifications/read-all',  [NotificationController::class, 'markAllRead']);
     Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+
+    // Invitations
+    Route::get ('/invitations',                    [InvitationController::class, 'index']);
+    Route::post('/invitations/{invitation}/accept',  [InvitationController::class, 'accept']);
+    Route::post('/invitations/{invitation}/decline', [InvitationController::class, 'decline']);
 
     // Admin
     Route::get   ('/admin/stats',        [AdminController::class, 'stats']);

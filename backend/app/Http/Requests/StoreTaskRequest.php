@@ -18,6 +18,7 @@ class StoreTaskRequest extends FormRequest
             'assignee_id'   => 'nullable|exists:users,id',
             'reward_points' => 'nullable|integer|min:0',
             'category'      => 'nullable|string|max:100',
+            'project_id'    => 'nullable|exists:projects,id',
         ];
     }
 
@@ -32,6 +33,7 @@ class StoreTaskRequest extends FormRequest
             'reward_points.integer' => 'Баллы должны быть целым числом.',
             'reward_points.min'     => 'Баллы не могут быть отрицательными.',
             'category.max'          => 'Категория не должна превышать 100 символов.',
+            'project_id.exists'     => 'Проект не найден.',
         ];
     }
 }

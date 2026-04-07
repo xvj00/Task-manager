@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Project extends Model
 {
-    protected $fillable = ['name', 'description', 'owner_id', 'folder_id', 'invite_token'];
+    protected $fillable = ['name', 'description', 'owner_id', 'folder_id', 'invite_token', 'invite_link_role'];
 
     public function owner()   { return $this->belongsTo(User::class, 'owner_id'); }
     public function folder()  { return $this->belongsTo(Folder::class); }

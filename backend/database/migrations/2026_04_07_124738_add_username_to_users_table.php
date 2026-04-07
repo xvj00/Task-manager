@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->string('username')->nullable()->unique()->after('name');
-        });
+        if (!Schema::hasColumn('users', 'username')) {
+            Schema::table('users', function (Blueprint $table) {
+                $table->string('username')->nullable()->unique()->after('name');
+            });
+        }
 
         // Заполняем username из email для существующих записей
         \DB::table('users')->get()->each(function ($user) {
@@ -30,6 +32,9 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->string('username')->nullable(false)->change();
         });
+
+        // Сначала расширяем ENUM чтобы принимал и старые и новые значения
+        \DB::statement("ALTER TABLE users MODIFY role ENUM('creator','executor','admin','user') NOT NULL DEFAULT 'user'");
 
         // Меняем значения роли: creator → admin, executor → user
         \DB::table('users')->where('role', 'creator')->update(['role' => 'admin']);

@@ -86,22 +86,33 @@ class FolderController extends Controller
             abort(422, 'Пользователь уже является участником папки.');
         }
 
-        $folder->members()->attach($invitee->id, ['role' => $data['role']]);
+        $exists = \App\Models\Invitation::where('type', 'folder')
+            ->where('entity_id', $folder->id)
+            ->where('invitee_id', $invitee->id)
+            ->where('status', 'pending')
+            ->exists();
+        if ($exists) abort(422, 'Приглашение уже отправлено, ожидается ответ.');
 
-        // Автоматически добавляем в все проекты папки
-        foreach ($folder->projects as $project) {
-            if (!$project->members()->where('user_id', $invitee->id)->exists()) {
-                $project->members()->attach($invitee->id, ['role' => $data['role']]);
-            }
-        }
+        \App\Models\Invitation::create([
+            'type'       => 'folder',
+            'entity_id'  => $folder->id,
+            'inviter_id' => $request->user()->id,
+            'invitee_id' => $invitee->id,
+            'role'       => $data['role'],
+        ]);
 
         \App\Models\Notification::create([
             'user_id' => $invitee->id,
-            'type'    => 'folder_invited',
-            'data'    => ['folder_id' => $folder->id, 'folder_name' => $folder->name],
+            'type'    => 'folder_invite',
+            'data'    => [
+                'folder_id'    => $folder->id,
+                'folder_name'  => $folder->name,
+                'inviter_name' => $request->user()->name,
+                'role'         => $data['role'],
+            ],
         ]);
 
-        return response()->json(['message' => 'Пользователь приглашён в папку.']);
+        return response()->json(['message' => 'Приглашение отправлено.']);
     }
 
     public function removeMember(Request $request, Folder $folder, \App\Models\User $user)

@@ -16,6 +16,7 @@ import PrizesPage from './pages/PrizesPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
 import InvitePage from './pages/InvitePage';
+import NotificationsPage from './pages/NotificationsPage';
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/prizes"         element={<PrizesPage />} />
           <Route path="/leaderboard"    element={<LeaderboardPage />} />
           <Route path="/admin"          element={<AdminPage />} />
+          <Route path="/notifications"  element={<NotificationsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

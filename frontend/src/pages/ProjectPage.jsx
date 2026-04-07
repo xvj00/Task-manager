@@ -32,6 +32,7 @@ export default function ProjectPage() {
   const [inviteUsername, setInviteUsername] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
   const [inviteLink, setInviteLink] = useState('');
+  const [inviteLinkRole, setInviteLinkRole] = useState('member');
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).catch(() => navigate('/projects'));
   useEffect(() => { load(); }, [id]);
@@ -44,17 +45,19 @@ export default function ProjectPage() {
     } catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
   };
 
-  const loadInviteLink = async () => {
-    if (inviteLink) { setInviteLink(''); return; }
-    const r = await api.get(`/projects/${id}/invite-link`);
+  const loadInviteLink = async (role) => {
+    const params = role ? `?role=${role}` : '';
+    const r = await api.get(`/projects/${id}/invite-link${params}`);
     setInviteLink(`${window.location.origin}/invite/${r.data.invite_token}`);
+    setInviteLinkRole(r.data.invite_link_role || 'member');
   };
 
   const copyLink = () => { navigator.clipboard.writeText(inviteLink); toast.success('Ссылка скопирована!'); };
 
   const resetLink = async () => {
     await api.delete(`/projects/${id}/invite-link`);
-    toast.success('Ссылка сброшена'); setInviteLink(''); loadInviteLink();
+    toast.success('Ссылка сброшена');
+    setInviteLink('');
   };
 
   const handleRemoveMember = async (userId) => {
@@ -70,7 +73,7 @@ export default function ProjectPage() {
 
   if (!project) return <div className="loading">Загрузка...</div>;
 
-  const isOwner   = project.owner_id === user?.id || user?.role === 'creator';
+  const isOwner   = project.owner_id === user?.id || user?.role === 'admin';
   const myRole    = project.members?.find(m => m.id === user?.id)?.pivot?.role;
   const canManage = isOwner || myRole === 'editor';
   const tasks     = project.tasks || [];
@@ -87,7 +90,7 @@ export default function ProjectPage() {
         </div>
         <div className="page-actions">
           {canManage && <button className="btn btn-secondary btn-sm" onClick={() => setShowInvite(!showInvite)}>👤 Пригласить</button>}
-          {canManage && <button className="btn btn-secondary btn-sm" onClick={loadInviteLink}>🔗 Ссылка</button>}
+          {canManage && <button className="btn btn-secondary btn-sm" onClick={() => inviteLink ? setInviteLink('') : loadInviteLink()}>🔗 Ссылка</button>}
           {isOwner && <button className="btn btn-danger btn-sm" onClick={handleDelete}>Удалить</button>}
           {canManage && <Link to={`/tasks/new?project_id=${id}`} className="btn btn-primary">+ Задача</Link>}
         </div>
@@ -118,10 +121,24 @@ export default function ProjectPage() {
 
       {inviteLink && (
         <div className="invite-link-box">
-          <span className="invite-link-label">🔗 Ссылка-приглашение:</span>
-          <input readOnly value={inviteLink} className="invite-link-input" onClick={e => e.target.select()} />
-          <button className="btn btn-secondary btn-sm" onClick={copyLink}>Копировать</button>
-          <button className="btn btn-danger btn-sm" onClick={resetLink}>Сбросить</button>
+          <div className="invite-link-header">
+            <span className="invite-link-label">🔗 Ссылка-приглашение</span>
+            <div className="invite-link-role-select">
+              <label>Роль приглашённых:</label>
+              <select
+                value={inviteLinkRole}
+                onChange={e => loadInviteLink(e.target.value)}
+              >
+                <option value="member">Пользователь — просматривает, берёт задачи</option>
+                <option value="editor">Соавтор — создаёт задачи, приглашает (без удаления)</option>
+              </select>
+            </div>
+          </div>
+          <div className="invite-link-row">
+            <input readOnly value={inviteLink} className="invite-link-input" onClick={e => e.target.select()} />
+            <button className="btn btn-secondary btn-sm" onClick={copyLink}>Копировать</button>
+            <button className="btn btn-danger btn-sm" onClick={resetLink}>Сбросить</button>
+          </div>
         </div>
       )}
 
