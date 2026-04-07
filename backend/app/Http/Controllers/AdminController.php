@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateUserRequest;
+use App\Models\Folder;
+use App\Models\Project;
 use App\Models\Task;
 use App\Models\Transaction;
 use App\Models\User;
@@ -14,6 +16,8 @@ class AdminController extends Controller
     {
         return response()->json([
             'users'         => User::where('role', 'executor')->count(),
+            'projects'      => Project::count(),
+            'folders'       => Folder::count(),
             'tasks_total'   => Task::count(),
             'tasks_review'  => Task::where('status', 'review')->count(),
             'tasks_done'    => Task::where('status', 'done')->count(),

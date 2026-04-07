@@ -4,11 +4,13 @@ import useAuthStore from '../../store/authStore';
 import NotificationsBell from '../common/NotificationsBell';
 
 const NAV = [
-  { path: '/',             icon: '🏠', label: 'Главная'         },
-  { path: '/tasks',        icon: '📋', label: 'Задачи'          },
-  { path: '/balance',      icon: '💰', label: 'Мой баланс'      },
-  { path: '/prizes',       icon: '🎁', label: 'Витрина наград'  },
-  { path: '/leaderboard',  icon: '🏆', label: 'Лидерборд'       },
+  { path: '/',            icon: '🏠', label: 'Главная'        },
+  { path: '/folders',     icon: '📁', label: 'Папки'          },
+  { path: '/projects',    icon: '🗂', label: 'Проекты'        },
+  { path: '/tasks',       icon: '📋', label: 'Задачи'         },
+  { path: '/balance',     icon: '💰', label: 'Мой баланс'     },
+  { path: '/prizes',      icon: '🎁', label: 'Витрина наград' },
+  { path: '/leaderboard', icon: '🏆', label: 'Лидерборд'      },
 ];
 
 const CREATOR_NAV = [
