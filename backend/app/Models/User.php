@@ -11,7 +11,7 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasApiTokens;
 
-    protected $fillable = ['name', 'email', 'password', 'role', 'balance'];
+    protected $fillable = ['name', 'username', 'email', 'password', 'role', 'balance'];
     protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
@@ -19,11 +19,15 @@ class User extends Authenticatable
         return ['email_verified_at' => 'datetime', 'password' => 'hashed'];
     }
 
-    public function isCreator(): bool { return $this->role === 'creator'; }
+    public function isAdmin(): bool   { return $this->role === 'admin'; }
+    /** @deprecated используй isAdmin() */
+    public function isCreator(): bool { return $this->isAdmin(); }
 
-    public function tasks() { return $this->hasMany(Task::class, 'assignee_id'); }
+    public function tasks()        { return $this->hasMany(Task::class, 'assignee_id'); }
     public function createdTasks() { return $this->hasMany(Task::class, 'creator_id'); }
     public function transactions() { return $this->hasMany(Transaction::class); }
-    public function notifications() { return $this->hasMany(Notification::class); }
-    public function prizeRequests() { return $this->hasMany(PrizeRequest::class); }
+    public function notifications(){ return $this->hasMany(Notification::class); }
+    public function prizeRequests(){ return $this->hasMany(PrizeRequest::class); }
+    public function projects()     { return $this->belongsToMany(Project::class, 'project_user')->withPivot('role'); }
+    public function folders()      { return $this->belongsToMany(Folder::class, 'folder_user')->withPivot('role'); }
 }

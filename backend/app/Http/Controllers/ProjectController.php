@@ -6,6 +6,7 @@ use App\Models\Notification;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class ProjectController extends Controller
 {
@@ -17,6 +18,7 @@ class ProjectController extends Controller
             ->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
                   ->orWhereHas('members', fn($m) => $m->where('user_id', $user->id));
+                if ($user->isAdmin()) $q->orWhereNotNull('id'); // admin видит все
             })
             ->withCount('tasks')
             ->get();
@@ -26,17 +28,24 @@ class ProjectController extends Controller
 
     public function store(Request $request)
     {
+        // Любой авторизованный пользователь может создать проект
         $data = $request->validate([
             'name'        => 'required|string|max:255',
             'description' => 'nullable|string',
             'folder_id'   => 'nullable|exists:folders,id',
         ], [
-            'name.required'   => 'Название проекта обязательно.',
-            'name.max'        => 'Название не должно превышать 255 символов.',
-            'folder_id.exists'=> 'Папка не найдена.',
+            'name.required'    => 'Название проекта обязательно.',
+            'name.max'         => 'Название не должно превышать 255 символов.',
+            'folder_id.exists' => 'Папка не найдена.',
         ]);
 
-        $project = Project::create([...$data, 'owner_id' => $request->user()->id]);
+        $project = Project::create([
+            ...$data,
+            'owner_id'     => $request->user()->id,
+            'invite_token' => Str::uuid(),
+        ]);
+
+        // Создатель автоматически становится владельцем
         $project->members()->attach($request->user()->id, ['role' => 'owner']);
 
         // Если создаём в папке — добавляем всех участников папки
@@ -82,22 +91,22 @@ class ProjectController extends Controller
         return response()->json(null, 204);
     }
 
+    // Пригласить по юзернейму
     public function invite(Request $request, Project $project)
     {
         $this->checkRole($request->user(), $project, ['owner', 'editor']);
 
         $data = $request->validate([
-            'email' => 'required|email|exists:users,email',
-            'role'  => 'required|in:editor,member',
+            'username' => 'required|string|exists:users,username',
+            'role'     => 'required|in:editor,member',
         ], [
-            'email.required' => 'Email обязателен.',
-            'email.email'    => 'Введите корректный email.',
-            'email.exists'   => 'Пользователь с таким email не найден.',
-            'role.required'  => 'Роль обязательна.',
-            'role.in'        => 'Роль должна быть: editor или member.',
+            'username.required' => 'Юзернейм обязателен.',
+            'username.exists'   => 'Пользователь с таким юзернеймом не найден.',
+            'role.required'     => 'Роль обязательна.',
+            'role.in'           => 'Роль должна быть: editor или member.',
         ]);
 
-        $invitee = User::where('email', $data['email'])->first();
+        $invitee = User::where('username', $data['username'])->first();
 
         if ($project->members()->where('user_id', $invitee->id)->exists()) {
             abort(422, 'Пользователь уже является участником проекта.');
@@ -111,7 +120,41 @@ class ProjectController extends Controller
             'data'    => ['project_id' => $project->id, 'project_name' => $project->name],
         ]);
 
-        return response()->json(['message' => 'Пользователь приглашён в проект.']);
+        return response()->json(['message' => "Пользователь @{$invitee->username} приглашён в проект."]);
+    }
+
+    // Получить/сбросить ссылку-приглашение
+    public function inviteLink(Request $request, Project $project)
+    {
+        $this->checkRole($request->user(), $project, ['owner', 'editor']);
+
+        if ($request->method() === 'DELETE') {
+            $project->update(['invite_token' => Str::uuid()]);
+            return response()->json(['message' => 'Ссылка сброшена.']);
+        }
+
+        return response()->json(['invite_token' => $project->invite_token]);
+    }
+
+    // Вступить по ссылке-приглашению
+    public function joinByToken(Request $request, string $token)
+    {
+        $project = Project::where('invite_token', $token)->firstOrFail();
+        $user    = $request->user();
+
+        if ($project->members()->where('user_id', $user->id)->exists()) {
+            return response()->json(['message' => 'Вы уже участник этого проекта.', 'project' => $project]);
+        }
+
+        $project->members()->attach($user->id, ['role' => 'member']);
+
+        Notification::create([
+            'user_id' => $project->owner_id,
+            'type'    => 'project_joined',
+            'data'    => ['project_id' => $project->id, 'project_name' => $project->name, 'user' => $user->name],
+        ]);
+
+        return response()->json(['message' => "Вы вступили в проект «{$project->name}».", 'project' => $project]);
     }
 
     public function removeMember(Request $request, Project $project, User $user)
@@ -124,14 +167,14 @@ class ProjectController extends Controller
 
     private function checkAccess($user, Project $project): void
     {
-        if ($user->isCreator()) return;
+        if ($user->isAdmin()) return;
         if ($project->owner_id === $user->id) return;
         if (!$project->members()->where('user_id', $user->id)->exists()) abort(403, 'Нет доступа к этому проекту.');
     }
 
     private function checkRole($user, Project $project, array $roles): void
     {
-        if ($user->isCreator()) return;
+        if ($user->isAdmin()) return;
         $role = $project->userRole($user->id);
         if (!in_array($role, $roles)) abort(403, 'Недостаточно прав.');
     }

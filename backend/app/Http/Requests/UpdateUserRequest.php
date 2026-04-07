@@ -12,7 +12,7 @@ class UpdateUserRequest extends FormRequest
     {
         return [
             'name'  => 'sometimes|string|max:255',
-            'role'  => 'sometimes|in:creator,executor',
+            'role'  => 'sometimes|in:admin,user',
             'email' => 'sometimes|email|unique:users,email,' . $this->route('user')->id,
         ];
     }
@@ -21,7 +21,7 @@ class UpdateUserRequest extends FormRequest
     {
         return [
             'name.max'      => 'Имя не должно превышать 255 символов.',
-            'role.in'       => 'Роль должна быть: creator или executor.',
+            'role.in'       => 'Роль должна быть: admin или user.',
             'email.email'   => 'Введите корректный email адрес.',
             'email.unique'  => 'Пользователь с таким email уже существует.',
         ];

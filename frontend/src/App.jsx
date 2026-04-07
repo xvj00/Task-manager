@@ -15,14 +15,16 @@ import BalancePage from './pages/BalancePage';
 import PrizesPage from './pages/PrizesPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
+import InvitePage from './pages/InvitePage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
       <Routes>
-        <Route path="/login"    element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/login"         element={<LoginPage />} />
+        <Route path="/register"      element={<RegisterPage />} />
+        <Route path="/invite/:token" element={<InvitePage />} />
         <Route element={<AppLayout />}>
           <Route path="/"               element={<DashboardPage />} />
           <Route path="/folders"        element={<FoldersPage />} />

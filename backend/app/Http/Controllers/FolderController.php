@@ -71,17 +71,16 @@ class FolderController extends Controller
         $this->checkRole($request->user(), $folder, ['owner', 'editor']);
 
         $data = $request->validate([
-            'email' => 'required|email|exists:users,email',
-            'role'  => 'required|in:editor,member',
+            'username' => 'required|string|exists:users,username',
+            'role'     => 'required|in:editor,member',
         ], [
-            'email.required' => 'Email обязателен.',
-            'email.email'    => 'Введите корректный email.',
-            'email.exists'   => 'Пользователь с таким email не найден.',
-            'role.required'  => 'Роль обязательна.',
-            'role.in'        => 'Роль должна быть: editor или member.',
+            'username.required' => 'Юзернейм обязателен.',
+            'username.exists'   => 'Пользователь с таким юзернеймом не найден.',
+            'role.required'     => 'Роль обязательна.',
+            'role.in'           => 'Роль должна быть: editor или member.',
         ]);
 
-        $invitee = \App\Models\User::where('email', $data['email'])->first();
+        $invitee = \App\Models\User::where('username', $data['username'])->first();
 
         if ($folder->members()->where('user_id', $invitee->id)->exists()) {
             abort(422, 'Пользователь уже является участником папки.');
@@ -115,14 +114,14 @@ class FolderController extends Controller
 
     private function checkAccess($user, Folder $folder): void
     {
-        if ($user->isCreator()) return;
+        if ($user->isAdmin()) return;
         if ($folder->owner_id === $user->id) return;
         if (!$folder->members()->where('user_id', $user->id)->exists()) abort(403, 'Нет доступа к этой папке.');
     }
 
     private function checkRole($user, Folder $folder, array $roles): void
     {
-        if ($user->isCreator()) return;
+        if ($user->isAdmin()) return;
         $role = $folder->userRole($user->id);
         if (!in_array($role, $roles)) abort(403, 'Недостаточно прав.');
     }

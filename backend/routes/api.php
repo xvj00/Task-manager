@@ -37,6 +37,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put   ('/projects/{project}',                   [ProjectController::class, 'update']);
     Route::delete('/projects/{project}',                   [ProjectController::class, 'destroy']);
     Route::post  ('/projects/{project}/invite',            [ProjectController::class, 'invite']);
+    Route::get   ('/projects/{project}/invite-link',       [ProjectController::class, 'inviteLink']);
+    Route::delete('/projects/{project}/invite-link',       [ProjectController::class, 'inviteLink']);
+    Route::post  ('/projects/join/{token}',                [ProjectController::class, 'joinByToken']);
     Route::delete('/projects/{project}/members/{user}',    [ProjectController::class, 'removeMember']);
 
     // Tasks

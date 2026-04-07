@@ -399,6 +399,11 @@ a{text-decoration:none;color:inherit;}
 .comment-add-form textarea:focus{border-color:var(--primary);}
 .comment-add-form .btn{align-self:flex-end;}
 
+/* Invite link */
+.invite-link-box{display:flex;align-items:center;gap:8px;background:var(--primary-light);border:1px solid #c7d2fe;border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;flex-wrap:wrap;}
+.invite-link-label{font-size:13px;font-weight:600;color:var(--primary);white-space:nowrap;}
+.invite-link-input{flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:12.5px;font-family:monospace;background:var(--surface);outline:none;min-width:200px;}
+
 /* Responsive */
 @media (max-width: 900px) {
   .sidebar{transform:translateX(-100%);transition:transform var(--t);}

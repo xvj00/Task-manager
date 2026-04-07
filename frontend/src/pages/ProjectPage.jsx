@@ -29,8 +29,9 @@ export default function ProjectPage() {
   const [project, setProject] = useState(null);
   const [view, setView] = useState('list');
   const [showInvite, setShowInvite] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteUsername, setInviteUsername] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
+  const [inviteLink, setInviteLink] = useState('');
 
   const load = () => api.get(`/projects/${id}`).then(r => setProject(r.data)).catch(() => navigate('/projects'));
   useEffect(() => { load(); }, [id]);
@@ -38,9 +39,22 @@ export default function ProjectPage() {
   const handleInvite = async (e) => {
     e.preventDefault();
     try {
-      await api.post(`/projects/${id}/invite`, { email: inviteEmail, role: inviteRole });
-      toast.success('Пользователь приглашён'); setInviteEmail(''); setShowInvite(false); load();
+      const r = await api.post(`/projects/${id}/invite`, { username: inviteUsername, role: inviteRole });
+      toast.success(r.data.message); setInviteUsername(''); setShowInvite(false); load();
     } catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
+  };
+
+  const loadInviteLink = async () => {
+    if (inviteLink) { setInviteLink(''); return; }
+    const r = await api.get(`/projects/${id}/invite-link`);
+    setInviteLink(`${window.location.origin}/invite/${r.data.invite_token}`);
+  };
+
+  const copyLink = () => { navigator.clipboard.writeText(inviteLink); toast.success('Ссылка скопирована!'); };
+
+  const resetLink = async () => {
+    await api.delete(`/projects/${id}/invite-link`);
+    toast.success('Ссылка сброшена'); setInviteLink(''); loadInviteLink();
   };
 
   const handleRemoveMember = async (userId) => {
@@ -72,7 +86,8 @@ export default function ProjectPage() {
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
         <div className="page-actions">
-          {canManage && <button className="btn btn-secondary btn-sm" onClick={() => setShowInvite(!showInvite)}>+ Пригласить</button>}
+          {canManage && <button className="btn btn-secondary btn-sm" onClick={() => setShowInvite(!showInvite)}>👤 Пригласить</button>}
+          {canManage && <button className="btn btn-secondary btn-sm" onClick={loadInviteLink}>🔗 Ссылка</button>}
           {isOwner && <button className="btn btn-danger btn-sm" onClick={handleDelete}>Удалить</button>}
           {canManage && <Link to={`/tasks/new?project_id=${id}`} className="btn btn-primary">+ Задача</Link>}
         </div>
@@ -80,11 +95,11 @@ export default function ProjectPage() {
 
       {showInvite && (
         <form onSubmit={handleInvite} className="form-card" style={{ marginBottom: 20 }}>
-          <h3>Пригласить в проект</h3>
+          <h3>Пригласить по юзернейму</h3>
           <div className="form-row">
             <div className="form-group">
-              <label>Email</label>
-              <input type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} required placeholder="user@example.com" />
+              <label>Юзернейм</label>
+              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} required placeholder="@username" />
             </div>
             <div className="form-group">
               <label>Роль</label>
@@ -99,6 +114,15 @@ export default function ProjectPage() {
             <button type="submit" className="btn btn-primary">Пригласить</button>
           </div>
         </form>
+      )}
+
+      {inviteLink && (
+        <div className="invite-link-box">
+          <span className="invite-link-label">🔗 Ссылка-приглашение:</span>
+          <input readOnly value={inviteLink} className="invite-link-input" onClick={e => e.target.select()} />
+          <button className="btn btn-secondary btn-sm" onClick={copyLink}>Копировать</button>
+          <button className="btn btn-danger btn-sm" onClick={resetLink}>Сбросить</button>
+        </div>
       )}
 
       <div className="project-stats">

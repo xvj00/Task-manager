@@ -167,7 +167,7 @@ export default function TaskDetailPage() {
             {task.attachments?.map(a => (
               <div key={a.id} className="attachment-row">
                 <span className="attachment-icon">{getFileIcon(a.mime_type)}</span>
-                <a href={`http://localhost:8001/storage/attachments/${a.filename}`} target="_blank" rel="noopener noreferrer" className="attachment-name">{a.original_name}</a>
+                <a href={`http://127.0.0.1:8001/storage/attachments/${a.filename}`} target="_blank" rel="noopener noreferrer" className="attachment-name">{a.original_name}</a>
                 <span className="attachment-size">{formatSize(a.size)}</span>
                 <button className="btn btn-danger btn-xs" onClick={() => deleteAttachment(a.id)}>×</button>
               </div>

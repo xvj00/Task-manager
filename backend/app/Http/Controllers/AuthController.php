@@ -14,8 +14,8 @@ class AuthController extends Controller
     {
         $data = $request->validated();
 
-        // Первый пользователь становится создателем
-        $role = User::count() === 0 ? 'creator' : 'executor';
+        // Первый пользователь становится администратором
+        $role = User::count() === 0 ? 'admin' : 'user';
         $user = User::create([...$data, 'role' => $role]);
         $token = $user->createToken('auth_token')->plainTextToken;
 

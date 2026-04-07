@@ -17,7 +17,9 @@ export default function AdminPage() {
     api.get('/balances').then(r => setBalances(r.data));
   };
 
-  useEffect(() => { if (user?.role === 'creator') load(); }, [user]);
+  useEffect(() => { if (user?.role === 'admin') load(); }, [user]);
+
+  if (user?.role !== 'admin') return <div className="empty-state-big">⛔ Доступ запрещён</div>;
 
   const handleManual = async (e) => {
     e.preventDefault();
@@ -33,7 +35,6 @@ export default function AdminPage() {
     try { await api.put(`/admin/users/${userId}`, { role }); toast.success('Роль изменена'); load(); }
     catch (e) { toast.error(e.response?.data?.message || 'Ошибка'); }
   };
-
   const handleDelete = async (userId) => {
     if (!confirm('Удалить пользователя?')) return;
     try { await api.delete(`/admin/users/${userId}`); toast.success('Удалён'); load(); }
@@ -41,11 +42,11 @@ export default function AdminPage() {
   };
 
   const upd = f => e => setManualForm({...manualForm, [f]: e.target.value});
-  const executors = users.filter(u => u.role === 'executor');
+  const executors = users.filter(u => u.role !== 'admin');
 
   return (
     <div className="page">
-      <div className="page-header"><h1>⚙️ Панель создателя</h1></div>
+      <div className="page-header"><h1>🛡 Панель администратора</h1></div>
 
       {stats && (
         <div className="stats-grid">
@@ -83,8 +84,8 @@ export default function AdminPage() {
                 <td>{u.email}</td>
                 <td>
                   <select value={u.role} onChange={e => handleRoleChange(u.id, e.target.value)}>
-                    <option value="executor">Исполнитель</option>
-                    <option value="creator">Создатель</option>
+                    <option value="user">Пользователь</option>
+                    <option value="admin">Администратор</option>
                   </select>
                 </td>
                 <td>💰 {u.balance}</td>

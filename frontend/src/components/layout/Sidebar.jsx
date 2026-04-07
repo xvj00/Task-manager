@@ -13,8 +13,8 @@ const NAV = [
   { path: '/leaderboard', icon: '🏆', label: 'Лидерборд'      },
 ];
 
-const CREATOR_NAV = [
-  { path: '/admin',        icon: '⚙️',  label: 'Панель создателя'},
+const ADMIN_NAV = [
+  { path: '/admin', icon: '⚙️', label: 'Администратор' },
 ];
 
 export default function Sidebar() {
@@ -22,14 +22,13 @@ export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Refresh user data (balance) every 60 seconds
   useEffect(() => {
     const iv = setInterval(() => { fetchMe().catch(() => {}); }, 60000);
     return () => clearInterval(iv);
   }, []);
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
-  const initials = user?.name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || '?';
+  const initials = user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
 
   return (
     <aside className="sidebar">
@@ -47,10 +46,10 @@ export default function Sidebar() {
           </Link>
         ))}
 
-        {user?.role === 'creator' && (
+        {user?.role === 'admin' && (
           <>
-            <div className="nav-divider">Управление</div>
-            {CREATOR_NAV.map(n => (
+            <div className="nav-divider">Система</div>
+            {ADMIN_NAV.map(n => (
               <Link key={n.path} to={n.path} className={`nav-item nav-creator ${location.pathname.startsWith(n.path) ? 'active' : ''}`}>
                 <span className="nav-icon">{n.icon}</span> {n.label}
               </Link>
@@ -64,14 +63,14 @@ export default function Sidebar() {
           <div className="user-avatar">{initials}</div>
           <div>
             <div className="user-name">{user?.name}</div>
-            <div className="user-role">{user?.role === 'creator' ? '👑 Создатель' : '⚡ Исполнитель'}</div>
+            <div className="user-role" style={{ fontSize: 11 }}>
+              @{user?.username} · {user?.role === 'admin' ? '🛡 Администратор' : '👤 Пользователь'}
+            </div>
           </div>
         </div>
-        {user?.role === 'executor' && (
-          <div className="sidebar-balance">
-            💰 <strong>{user?.balance ?? 0}</strong> баллов
-          </div>
-        )}
+        <div className="sidebar-balance">
+          💰 <strong>{user?.balance ?? 0}</strong> баллов
+        </div>
         <button className="btn-logout" onClick={handleLogout}>Выйти</button>
       </div>
     </aside>
