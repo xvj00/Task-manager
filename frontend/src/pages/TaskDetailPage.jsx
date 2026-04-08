@@ -26,6 +26,7 @@ export default function TaskDetailPage() {
   const [newSubtask, setNewSubtask]       = useState('');
   const [newComment, setNewComment]       = useState('');
   const [subtasks, setSubtasks]           = useState([]);
+  const [previewFile, setPreviewFile]     = useState(null);
   const dragIndexRef = useRef(null);
   const fileRef = useRef();
 
@@ -96,17 +97,18 @@ export default function TaskDetailPage() {
   const doneCount  = subtasks.filter(s => s.is_done).length;
   const totalCount = subtasks.length;
 
-  // canManage: может создавать задачи, подтверждать, отклонять, архивировать
-  // — глобальный admin всегда
-  // — owner или editor проекта (если задача привязана к проекту)
-  // — создатель задачи (для задач без проекта)
   const myProjectRole = project?.members?.find(m => m.id === user?.id)?.pivot?.role;
   const isProjectManager = project
     ? (project.owner_id === user?.id || myProjectRole === 'owner' || myProjectRole === 'editor')
     : false;
   const canManage = user?.role === 'admin' || isProjectManager || task.creator_id === user?.id;
 
+  const fileUrl = (a) => `http://127.0.0.1:8001/storage/attachments/${a.filename}`;
+  const isImage = (mime) => mime?.startsWith('image/');
+  const isPdf   = (mime) => mime === 'application/pdf';
+
   return (
+    <div className={`task-detail-layout ${previewFile ? 'with-preview' : ''}`}>
     <div className="page page-narrow-lg">
       <div className="page-header">
         <button className="btn btn-ghost" onClick={() => navigate(task.project_id ? `/projects/${task.project_id}` : '/tasks')}>← Назад</button>
@@ -218,11 +220,15 @@ export default function TaskDetailPage() {
           <div className="block-label">Вложения ({task.attachments?.length ?? 0})</div>
           <div className="attachments-list">
             {task.attachments?.map(a => (
-              <div key={a.id} className="attachment-row">
+              <div
+                key={a.id}
+                className={`attachment-row ${previewFile?.id === a.id ? 'active' : ''}`}
+                onClick={() => setPreviewFile(previewFile?.id === a.id ? null : a)}
+              >
                 <span className="attachment-icon">{getFileIcon(a.mime_type)}</span>
-                <a href={`http://127.0.0.1:8001/storage/attachments/${a.filename}`} target="_blank" rel="noopener noreferrer" className="attachment-name">{a.original_name}</a>
+                <span className="attachment-name">{a.original_name}</span>
                 <span className="attachment-size">{formatSize(a.size)}</span>
-                <button className="btn btn-danger btn-xs" onClick={() => deleteAttachment(a.id)}>×</button>
+                <button className="btn btn-danger btn-xs" onClick={(e) => { e.stopPropagation(); deleteAttachment(a.id); }}>×</button>
               </div>
             ))}
           </div>
@@ -278,6 +284,41 @@ export default function TaskDetailPage() {
           </div>
         )}
       </div>
+    </div>
+
+    {/* Панель предпросмотра файла справа */}
+    {previewFile && (
+      <div className="file-preview-panel">
+        <div className="file-preview-header">
+          <span className="file-preview-title" title={previewFile.original_name}>
+            {getFileIcon(previewFile.mime_type)} {previewFile.original_name}
+          </span>
+          <div className="file-preview-actions">
+            <a
+              href={fileUrl(previewFile)}
+              download={previewFile.original_name}
+              className="btn btn-secondary btn-sm"
+              onClick={e => e.stopPropagation()}
+            >⬇ Скачать</a>
+            <button className="file-preview-close" onClick={() => setPreviewFile(null)}>×</button>
+          </div>
+        </div>
+        <div className="file-preview-body">
+          {isImage(previewFile.mime_type) ? (
+            <img src={fileUrl(previewFile)} alt={previewFile.original_name} className="file-preview-img" />
+          ) : isPdf(previewFile.mime_type) ? (
+            <iframe src={fileUrl(previewFile)} title={previewFile.original_name} className="file-preview-iframe" />
+          ) : (
+            <div className="file-preview-fallback">
+              <div className="file-preview-big-icon">{getFileIcon(previewFile.mime_type)}</div>
+              <div className="file-preview-fallback-name">{previewFile.original_name}</div>
+              <div className="file-preview-fallback-size">{formatSize(previewFile.size)}</div>
+              <a href={fileUrl(previewFile)} download={previewFile.original_name} className="btn btn-primary">⬇ Скачать файл</a>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
     </div>
   );
 }
