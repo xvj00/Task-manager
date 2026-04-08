@@ -11,12 +11,12 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasApiTokens;
 
-    protected $fillable = ['name', 'username', 'email', 'password', 'role', 'balance', 'last_seen_at'];
+    protected $fillable = ['name', 'username', 'email', 'password', 'role', 'balance'];
     protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'last_seen_at' => 'datetime'];
+        return ['email_verified_at' => 'datetime', 'password' => 'hashed'];
     }
 
     public function isAdmin(): bool   { return $this->role === 'admin'; }

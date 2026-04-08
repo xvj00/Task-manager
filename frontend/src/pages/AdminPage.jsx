@@ -110,14 +110,13 @@ export default function AdminPage() {
       {stats && (
         <div className="stats-grid">
           {[
-            { icon: '👥', val: stats.users,         label: 'Пользователей',  hi: false },
-            { icon: '🟢', val: stats.users_online,  label: 'Сейчас онлайн', hi: stats.users_online > 0 },
-            { icon: '📋', val: stats.tasks_total,   label: 'Всего задач',   hi: false },
-            { icon: '⏳', val: stats.tasks_review,  label: 'На проверке',   hi: false },
-            { icon: '✅', val: stats.tasks_done,    label: 'Выполнено',     hi: false },
-            { icon: '💰', val: stats.points_issued, label: 'Баллов выдано', hi: false },
+            { icon: '👥', val: stats.users,         label: 'Пользователей' },
+            { icon: '📋', val: stats.tasks_total,   label: 'Всего задач'   },
+            { icon: '⏳', val: stats.tasks_review,  label: 'На проверке'   },
+            { icon: '✅', val: stats.tasks_done,    label: 'Выполнено'     },
+            { icon: '💰', val: stats.points_issued, label: 'Баллов выдано' },
           ].map(s => (
-            <div key={s.label} className={`stat-card ${s.hi ? 'stat-card-online' : ''}`}>
+            <div key={s.label} className="stat-card">
               <div className="stat-icon">{s.icon}</div>
               <div className="stat-value">{s.val}</div>
               <div className="stat-label">{s.label}</div>

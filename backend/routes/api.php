@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
 
-Route::middleware(['auth:sanctum', \App\Http\Middleware\UpdateLastSeen::class])->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get ('/me',     [AuthController::class, 'me']);
 
@@ -100,7 +100,6 @@ Route::middleware(['auth:sanctum', \App\Http\Middleware\UpdateLastSeen::class])-
     // Admin
     Route::get   ('/admin/stats',        [AdminController::class, 'stats']);
     Route::get   ('/admin/users',        [AdminController::class, 'users']);
-    Route::get   ('/admin/online',       [AdminController::class, 'onlineUsers']);
     Route::put   ('/admin/users/{user}', [AdminController::class, 'updateUser']);
     Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser']);
 });
