@@ -8,6 +8,10 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('al_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Для FormData убираем JSON Content-Type — браузер сам поставит multipart с boundary
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
