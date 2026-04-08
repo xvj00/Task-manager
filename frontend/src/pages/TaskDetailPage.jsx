@@ -25,13 +25,15 @@ export default function TaskDetailPage() {
   const [showReject, setShowReject]       = useState(false);
   const [newSubtask, setNewSubtask]       = useState('');
   const [newComment, setNewComment]       = useState('');
+  const [subtasks, setSubtasks]           = useState([]);
+  const dragIndexRef = useRef(null);
   const fileRef = useRef();
 
   const load = async () => {
     const r = await api.get(`/tasks/${id}`);
     setTask(r.data);
+    setSubtasks(r.data.subtasks || []);
     setApprovePoints(r.data.reward_points);
-    // Загружаем проект чтобы знать роль текущего пользователя
     if (r.data.project_id) {
       api.get(`/projects/${r.data.project_id}`)
         .then(pr => setProject(pr.data))
@@ -52,6 +54,25 @@ export default function TaskDetailPage() {
   const toggleSubtask = async (s)  => { try { await api.put(`/tasks/${id}/subtasks/${s.id}`, { is_done: !s.is_done }); load(); } catch (e) { toast.error('Ошибка'); } };
   const deleteSubtask = async (sid) => { try { await api.delete(`/tasks/${id}/subtasks/${sid}`); load(); } catch (e) { toast.error('Ошибка'); } };
 
+  // Drag-and-drop порядок подзадач
+  const onDragStart = (index) => { dragIndexRef.current = index; };
+  const onDragOver  = (e, index) => {
+    e.preventDefault();
+    const from = dragIndexRef.current;
+    if (from === null || from === index) return;
+    const reordered = [...subtasks];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(index, 0, moved);
+    dragIndexRef.current = index;
+    setSubtasks(reordered);
+  };
+  const onDragEnd = async () => {
+    dragIndexRef.current = null;
+    try {
+      await api.post(`/tasks/${id}/subtasks/reorder`, { ids: subtasks.map(s => s.id) });
+    } catch { toast.error('Не удалось сохранить порядок'); load(); }
+  };
+
   // Комментарии
   const addComment    = async (e)   => { e.preventDefault(); if (!newComment.trim()) return; try { await api.post(`/tasks/${id}/comments`, { content: newComment }); setNewComment(''); load(); } catch (e) { toast.error(e.response?.data?.message || 'Ошибка'); } };
   const deleteComment = async (cid) => { try { await api.delete(`/tasks/${id}/comments/${cid}`); load(); } catch (e) { toast.error('Ошибка'); } };
@@ -62,7 +83,7 @@ export default function TaskDetailPage() {
     if (!file) return;
     const fd = new FormData();
     fd.append('file', file);
-    try { await api.post(`/tasks/${id}/attachments`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }); toast.success('Файл загружен'); load(); }
+    try { await api.post(`/tasks/${id}/attachments`, fd); toast.success('Файл загружен'); load(); }
     catch (e) { toast.error(e.response?.data?.message || 'Ошибка загрузки'); }
     fileRef.current.value = '';
   };
@@ -72,8 +93,8 @@ export default function TaskDetailPage() {
 
   const meta       = STATUS_META[task.status] || {};
   const isAssignee = task.assignee_id === user?.id;
-  const doneCount  = task.subtasks?.filter(s => s.is_done).length ?? 0;
-  const totalCount = task.subtasks?.length ?? 0;
+  const doneCount  = subtasks.filter(s => s.is_done).length;
+  const totalCount = subtasks.length;
 
   // canManage: может создавать задачи, подтверждать, отклонять, архивировать
   // — глобальный admin всегда
@@ -136,8 +157,16 @@ export default function TaskDetailPage() {
             </div>
           )}
           <div className="subtasks-list">
-            {task.subtasks?.map(s => (
-              <div key={s.id} className={`subtask-row ${s.is_done ? 'done' : ''}`}>
+            {subtasks.map((s, index) => (
+              <div
+                key={s.id}
+                className={`subtask-row ${s.is_done ? 'done' : ''}`}
+                draggable
+                onDragStart={() => onDragStart(index)}
+                onDragOver={(e) => onDragOver(e, index)}
+                onDrop={onDragEnd}
+              >
+                <span className="subtask-drag-handle" title="Перетащить">⠿</span>
                 <input type="checkbox" checked={s.is_done} onChange={() => toggleSubtask(s)} />
                 <span className="subtask-title">{s.title}</span>
                 <button className="subtask-del" onClick={() => deleteSubtask(s.id)}>×</button>

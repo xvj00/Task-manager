@@ -28,6 +28,7 @@ class SubtaskController extends Controller
         $data = $request->validate([
             'title'   => 'sometimes|string|max:255',
             'is_done' => 'sometimes|boolean',
+            'order'   => 'sometimes|integer|min:0',
         ], [
             'title.max'      => 'Название не должно превышать 255 символов.',
             'is_done.boolean'=> 'Поле выполнения должно быть true или false.',
@@ -35,6 +36,20 @@ class SubtaskController extends Controller
 
         $subtask->update($data);
         return response()->json($subtask);
+    }
+
+    public function reorder(Request $request, Task $task)
+    {
+        $data = $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'integer',
+        ]);
+
+        foreach ($data['ids'] as $index => $subtaskId) {
+            $task->subtasks()->where('id', $subtaskId)->update(['order' => $index]);
+        }
+
+        return response()->json($task->subtasks()->orderBy('order')->get());
     }
 
     public function destroy(Task $task, Subtask $subtask)

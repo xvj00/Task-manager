@@ -78,7 +78,7 @@ class TaskController extends Controller
             || $task->status === 'open'
             || ($task->project_id && \App\Models\Project::find($task->project_id)?->members()->where('user_id', $user->id)->exists());
         if (!$canView) abort(403);
-        return response()->json($task->load('creator', 'assignee', 'logs.user'));
+        return response()->json($task->load('creator', 'assignee', 'logs.user', 'subtasks', 'comments.user', 'attachments.user'));
     }
 
     public function update(UpdateTaskRequest $request, Task $task)

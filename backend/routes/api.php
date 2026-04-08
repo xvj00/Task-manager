@@ -57,6 +57,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Subtasks
     Route::post  ('/tasks/{task}/subtasks',                        [SubtaskController::class, 'store']);
+    Route::post  ('/tasks/{task}/subtasks/reorder',                [SubtaskController::class, 'reorder']);
     Route::put   ('/tasks/{task}/subtasks/{subtask}',              [SubtaskController::class, 'update']);
     Route::delete('/tasks/{task}/subtasks/{subtask}',              [SubtaskController::class, 'destroy']);
 

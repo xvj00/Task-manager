@@ -401,9 +401,12 @@ a{text-decoration:none;color:inherit;}
 .subtasks-bar{height:4px;background:var(--border);border-radius:4px;margin-bottom:12px;overflow:hidden;}
 .subtasks-bar-fill{height:100%;background:var(--success);border-radius:4px;transition:width .3s ease;}
 .subtasks-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
-.subtask-row{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface-2);border-radius:var(--radius);}
+.subtask-row{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface-2);border-radius:var(--radius);cursor:default;user-select:none;}
+.subtask-row[draggable]:hover{background:var(--primary-light);}
 .subtask-row.done .subtask-title{text-decoration:line-through;color:var(--text-muted);}
 .subtask-row input[type=checkbox]{cursor:pointer;width:15px;height:15px;accent-color:var(--success);}
+.subtask-drag-handle{cursor:grab;color:var(--text-muted);font-size:14px;line-height:1;padding:0 2px;opacity:.5;}
+.subtask-drag-handle:hover{opacity:1;}
 .subtask-title{flex:1;font-size:13.5px;}
 .subtask-del{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:16px;line-height:1;padding:0 4px;}
 .subtask-del:hover{color:var(--danger);}

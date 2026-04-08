@@ -99,7 +99,12 @@ export default function CreateEditTaskPage() {
           </div>
           <div className="form-group">
             <label>Дедлайн</label>
-            <input type="datetime-local" value={form.deadline} onChange={upd('deadline')} />
+            <input
+              type="datetime-local"
+              value={form.deadline}
+              onChange={upd('deadline')}
+              min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+            />
           </div>
         </div>
         <div className="form-row">
