@@ -20,10 +20,21 @@ class TaskController extends Controller
         $user = $request->user();
         $query = Task::with(['creator', 'assignee']);
 
-        // Исполнитель видит только назначенные ему задачи и открытые
-        if (!$user->isCreator()) {
-            $query->where(function ($q) use ($user) {
-                $q->where('assignee_id', $user->id)->orWhere('status', 'open');
+        if (!$user->isAdmin()) {
+            // Проекты, в которых состоит пользователь
+            $projectIds = $user->projects()->pluck('projects.id');
+
+            $query->where(function ($q) use ($user, $projectIds) {
+                // Задачи, назначенные лично пользователю
+                $q->where('assignee_id', $user->id)
+                // Открытые задачи в проектах пользователя
+                  ->orWhere(function ($q2) use ($projectIds) {
+                      $q2->where('status', 'open')->whereIn('project_id', $projectIds);
+                  })
+                // Открытые задачи вне проектов (глобальные)
+                  ->orWhere(function ($q2) {
+                      $q2->where('status', 'open')->whereNull('project_id');
+                  });
             });
         }
 
@@ -64,6 +75,7 @@ class TaskController extends Controller
             $this->notify($data['assignee_id'], 'task_assigned', [
                 'task_id'    => $task->id,
                 'task_title' => $task->title,
+                'deadline'   => $task->deadline?->toISOString(),
             ]);
         }
 
@@ -91,7 +103,9 @@ class TaskController extends Controller
 
         if (isset($data['assignee_id']) && $data['assignee_id'] !== $oldAssignee && $data['assignee_id']) {
             $this->notify($data['assignee_id'], 'task_assigned', [
-                'task_id' => $task->id, 'task_title' => $task->title,
+                'task_id'    => $task->id,
+                'task_title' => $task->title,
+                'deadline'   => $task->deadline?->toISOString(),
             ]);
         }
 

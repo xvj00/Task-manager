@@ -22,7 +22,14 @@ const ROLE_LABELS = { owner: 'Владелец', editor: 'Соавтор', membe
 
 function formatType(n) {
   const base = TYPE_LABELS[n.type] || n.type;
-  if (n.data?.task_title)   return `${base}: «${n.data.task_title}»`;
+  if (n.data?.task_title) {
+    let text = `${base}: «${n.data.task_title}»`;
+    if (n.type === 'task_assigned' && n.data?.deadline) {
+      const d = new Date(n.data.deadline);
+      text += ` до ${d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+    }
+    return text;
+  }
   if (n.data?.prize_name)   return `${base}: «${n.data.prize_name}»`;
   if (n.data?.entity_name)  return `${base} — «${n.data.entity_name}» (${n.data.user_name})`;
   return base;

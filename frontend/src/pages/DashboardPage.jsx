@@ -14,48 +14,58 @@ const STATUS_META = {
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const [tasks, setTasks] = useState([]);
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
     api.get('/tasks').then(r => setTasks(r.data)).catch(() => {});
-    if (user?.role === 'creator') {
+    if (isAdmin) {
       api.get('/admin/stats').then(r => setStats(r.data)).catch(() => {});
     }
   }, [user]);
 
-  const myTasks = tasks.filter(t => t.assignee_id === user?.id || (user?.role === 'creator'));
+  // Мои задачи — назначенные лично мне
+  const myTasks = tasks.filter(t => t.assignee_id === user?.id);
+
+  // Задачи на проверке (видны только admin)
   const reviewTasks = tasks.filter(t => t.status === 'review');
+
+  // Дедлайн сегодня — из назначенных мне или всех (для admin)
   const todayTasks = tasks.filter(t => {
     if (!t.deadline) return false;
+    if (!isAdmin && t.assignee_id !== user?.id) return false;
     const d = new Date(t.deadline);
     const today = new Date();
     return d.toDateString() === today.toDateString();
   });
 
+  // Активные задачи
+  const activeTasks = tasks.filter(t => ['open', 'in_progress'].includes(t.status));
+
   return (
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Привет, {user?.name}! {user?.role === 'creator' ? '👑' : '⚡'}</h1>
+          <h1>Привет, {user?.name}! {isAdmin ? '👑' : '⚡'}</h1>
           <p className="page-subtitle">
-            {user?.role === 'creator' ? 'Панель управления заданиями' : `Ваш баланс: ${user?.balance ?? 0} баллов`}
+            {isAdmin ? 'Панель управления заданиями' : `Ваш баланс: ${user?.balance ?? 0} баллов`}
           </p>
         </div>
-        {user?.role === 'creator' && (
+        {isAdmin && (
           <Link to="/tasks/new" className="btn btn-primary">+ Новая задача</Link>
         )}
       </div>
 
-      {/* Статистика для создателя */}
-      {user?.role === 'creator' && stats && (
+      {/* Статистика для admin */}
+      {isAdmin && stats && (
         <div className="stats-grid">
           {[
-            { icon: '👥', val: stats.users,        label: 'Исполнителей'  },
-            { icon: '📋', val: stats.tasks_total,  label: 'Всего задач'   },
-            { icon: '⏳', val: stats.tasks_review, label: 'На проверке'   },
-            { icon: '✅', val: stats.tasks_done,   label: 'Выполнено'     },
-            { icon: '💰', val: stats.points_issued,label: 'Баллов выдано' },
+            { icon: '👥', val: stats.users,         label: 'Исполнителей'  },
+            { icon: '📋', val: stats.tasks_total,   label: 'Всего задач'   },
+            { icon: '⏳', val: stats.tasks_review,  label: 'На проверке'   },
+            { icon: '✅', val: stats.tasks_done,    label: 'Выполнено'     },
+            { icon: '💰', val: stats.points_issued, label: 'Баллов выдано' },
           ].map(s => (
             <div key={s.label} className="stat-card">
               <div className="stat-icon">{s.icon}</div>
@@ -67,8 +77,8 @@ export default function DashboardPage() {
       )}
 
       <div className="dashboard-cols">
-        {/* Задачи на проверке (для создателя) */}
-        {user?.role === 'creator' && (
+        {/* Задачи на проверке (только admin) */}
+        {isAdmin && (
           <div className="dash-section">
             <div className="dash-section-header">
               <h2>На проверке {reviewTasks.length > 0 && <span className="badge-count">{reviewTasks.length}</span>}</h2>
@@ -81,7 +91,21 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Мои задачи сегодня */}
+        {/* Мои задачи (для обычного пользователя) */}
+        {!isAdmin && (
+          <div className="dash-section">
+            <div className="dash-section-header">
+              <h2>Мои задачи {myTasks.length > 0 && <span className="badge-count">{myTasks.length}</span>}</h2>
+              <Link to="/tasks" className="link-more">Все</Link>
+            </div>
+            {myTasks.length === 0
+              ? <p className="empty-state">✨ Нет назначенных задач</p>
+              : myTasks.slice(0, 5).map(t => <TaskCard key={t.id} task={t} />)
+            }
+          </div>
+        )}
+
+        {/* Дедлайн сегодня */}
         <div className="dash-section">
           <div className="dash-section-header">
             <h2>Дедлайн сегодня {todayTasks.length > 0 && <span className="badge-count">{todayTasks.length}</span>}</h2>
@@ -98,9 +122,9 @@ export default function DashboardPage() {
             <h2>Активные задачи</h2>
             <Link to="/tasks" className="link-more">Все задачи</Link>
           </div>
-          {tasks.filter(t => ['open','in_progress'].includes(t.status)).length === 0
+          {activeTasks.length === 0
             ? <p className="empty-state">✨ Нет активных задач</p>
-            : tasks.filter(t => ['open','in_progress'].includes(t.status)).slice(0,5).map(t => <TaskCard key={t.id} task={t} />)
+            : activeTasks.slice(0, 5).map(t => <TaskCard key={t.id} task={t} />)
           }
         </div>
       </div>
@@ -116,6 +140,11 @@ function TaskCard({ task }) {
         <div className="task-card-mini-title">{task.title}</div>
         <div className="task-card-mini-footer">
           <span className={`status-badge ${meta.cls}`}>{meta.label}</span>
+          {task.deadline && (
+            <span className="task-card-deadline">
+              📅 {new Date(task.deadline).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
+            </span>
+          )}
           {task.reward_points > 0 && <span className="reward-chip">💰 {task.reward_points}</span>}
         </div>
       </div>

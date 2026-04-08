@@ -125,6 +125,7 @@ a{text-decoration:none;color:inherit;}
 .task-card-mini.priority-low{border-left-color:var(--success);}
 .task-card-mini-title{font-size:13.5px;font-weight:600;margin-bottom:6px;}
 .task-card-mini-footer{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.task-card-deadline{font-size:11.5px;color:var(--text-muted);margin-left:auto;}
 
 /* Toolbar */
 .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;}

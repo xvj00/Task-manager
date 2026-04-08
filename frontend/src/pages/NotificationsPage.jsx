@@ -30,7 +30,14 @@ function getTitle(n) {
 
 function getBody(n) {
   const d = n.data || {};
-  if (d.task_title)   return `«${d.task_title}»`;
+  if (d.task_title) {
+    let text = `«${d.task_title}»`;
+    if (n.type === 'task_assigned' && d.deadline) {
+      const dl = new Date(d.deadline);
+      text += ` — до ${dl.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+    }
+    return text;
+  }
   if (d.prize_name)   return `«${d.prize_name}»`;
   if (d.project_name && d.inviter_name) return `от ${d.inviter_name} — «${d.project_name}» (роль: ${ROLE_LABELS[d.role] || d.role})`;
   if (d.folder_name && d.inviter_name)  return `от ${d.inviter_name} — «${d.folder_name}» (роль: ${ROLE_LABELS[d.role] || d.role})`;
