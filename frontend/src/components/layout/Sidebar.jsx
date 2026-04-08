@@ -8,7 +8,6 @@ const NAV = [
   { path: '/folders',     icon: '📁', label: 'Папки'          },
   { path: '/projects',    icon: '🗂', label: 'Проекты'        },
   { path: '/tasks',       icon: '📋', label: 'Задачи'         },
-  { path: '/balance',     icon: '💰', label: 'Мой баланс'     },
   { path: '/prizes',      icon: '🎁', label: 'Витрина наград' },
   { path: '/leaderboard', icon: '🏆', label: 'Лидерборд'      },
 ];
