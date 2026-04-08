@@ -15,13 +15,22 @@ const STATUS_META = {
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
-  const [tasks, setTasks] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [tasks, setTasks]           = useState([]);
+  const [stats, setStats]           = useState(null);
+  const [onlineUsers, setOnlineUsers] = useState([]);
+
+  const loadOnline = () => {
+    if (isAdmin) api.get('/admin/online').then(r => setOnlineUsers(r.data)).catch(() => {});
+  };
 
   useEffect(() => {
     api.get('/tasks').then(r => setTasks(r.data)).catch(() => {});
     if (isAdmin) {
       api.get('/admin/stats').then(r => setStats(r.data)).catch(() => {});
+      loadOnline();
+      // Обновляем список онлайн каждые 30 секунд
+      const iv = setInterval(loadOnline, 30000);
+      return () => clearInterval(iv);
     }
   }, [user]);
 
@@ -61,18 +70,45 @@ export default function DashboardPage() {
       {isAdmin && stats && (
         <div className="stats-grid">
           {[
-            { icon: '👥', val: stats.users,         label: 'Исполнителей'  },
+            { icon: '👥', val: stats.users,         label: 'Пользователей' },
+            { icon: '🟢', val: stats.users_online,  label: 'Сейчас онлайн', highlight: stats.users_online > 0 },
             { icon: '📋', val: stats.tasks_total,   label: 'Всего задач'   },
             { icon: '⏳', val: stats.tasks_review,  label: 'На проверке'   },
             { icon: '✅', val: stats.tasks_done,    label: 'Выполнено'     },
             { icon: '💰', val: stats.points_issued, label: 'Баллов выдано' },
           ].map(s => (
-            <div key={s.label} className="stat-card">
+            <div key={s.label} className={`stat-card ${s.highlight ? 'stat-card-online' : ''}`}>
               <div className="stat-icon">{s.icon}</div>
               <div className="stat-value">{s.val}</div>
               <div className="stat-label">{s.label}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Онлайн пользователи */}
+      {isAdmin && onlineUsers.length > 0 && (
+        <div className="online-users-block">
+          <div className="online-users-header">
+            <span className="online-dot-pulse" />
+            <h3>Онлайн сейчас — {onlineUsers.length}</h3>
+          </div>
+          <div className="online-users-list">
+            {onlineUsers.map(u => (
+              <div key={u.id} className="online-user-chip">
+                <div className="online-user-avatar">{u.name?.[0]?.toUpperCase()}</div>
+                <div className="online-user-info">
+                  <div className="online-user-name">{u.name}</div>
+                  <div className="online-user-meta">
+                    {u.role === 'admin' ? '👑 Admin' : '👤 User'}
+                    {' · '}
+                    {lastSeenText(u.last_seen_at)}
+                  </div>
+                </div>
+                <span className="online-indicator" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -130,6 +166,14 @@ export default function DashboardPage() {
       </div>
     </div>
   );
+}
+
+function lastSeenText(dateStr) {
+  if (!dateStr) return '';
+  const sec = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (sec < 60)  return 'только что';
+  if (sec < 3600) return `${Math.floor(sec / 60)} мин. назад`;
+  return `${Math.floor(sec / 3600)} ч. назад`;
 }
 
 function TaskCard({ task }) {

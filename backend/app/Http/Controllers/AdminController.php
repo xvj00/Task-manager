@@ -14,8 +14,10 @@ class AdminController extends Controller
 {
     public function stats()
     {
+        $onlineThreshold = now()->subMinutes(5);
         return response()->json([
             'users'         => User::where('role', 'user')->count(),
+            'users_online'  => User::where('last_seen_at', '>=', $onlineThreshold)->count(),
             'projects'      => Project::count(),
             'folders'       => Folder::count(),
             'tasks_total'   => Task::count(),
@@ -23,6 +25,18 @@ class AdminController extends Controller
             'tasks_done'    => Task::where('status', 'done')->count(),
             'points_issued' => Transaction::where('type', 'credit')->sum('amount'),
         ]);
+    }
+
+    public function onlineUsers(Request $request)
+    {
+        if (!$request->user()->isAdmin()) abort(403);
+        $threshold = now()->subMinutes(5);
+        return response()->json(
+            User::where('last_seen_at', '>=', $threshold)
+                ->select('id', 'name', 'username', 'role', 'last_seen_at')
+                ->orderByDesc('last_seen_at')
+                ->get()
+        );
     }
 
     public function users(Request $request)

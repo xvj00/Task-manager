@@ -100,6 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin
     Route::get   ('/admin/stats',        [AdminController::class, 'stats']);
     Route::get   ('/admin/users',        [AdminController::class, 'users']);
+    Route::get   ('/admin/online',       [AdminController::class, 'onlineUsers']);
     Route::put   ('/admin/users/{user}', [AdminController::class, 'updateUser']);
     Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser']);
 });
