@@ -1,8 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
+
+function getFileIcon(mime) {
+  if (!mime) return '📄';
+  if (mime.startsWith('image/')) return '🖼';
+  if (mime === 'application/pdf') return '📕';
+  if (mime.includes('zip') || mime.includes('rar') || mime.includes('7z')) return '📦';
+  if (mime.includes('word') || mime.includes('document')) return '📝';
+  if (mime.includes('excel') || mime.includes('sheet')) return '📊';
+  return '📄';
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' Б';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+  return (bytes / 1024 / 1024).toFixed(1) + ' МБ';
+}
 
 export default function CreateEditTaskPage() {
   const { id } = useParams();
@@ -11,8 +28,11 @@ export default function CreateEditTaskPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get('project_id');
+  const fileInputRef = useRef();
 
   const [users, setUsers] = useState([]);
+  const [pendingFiles, setPendingFiles] = useState([]); // файлы ещё не загруженные
+  const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({
     title: '', description: '', deadline: '', priority: 'medium',
     assignee_id: '', reward_points: 0, category: '',
@@ -20,12 +40,9 @@ export default function CreateEditTaskPage() {
   });
 
   useEffect(() => {
-    // Загружаем список пользователей для назначения
     if (user?.role === 'admin') {
-      // Администратор видит всех
       api.get('/admin/users').then(r => setUsers(r.data)).catch(() => {});
     } else if (projectIdFromUrl) {
-      // Владелец/редактор проекта видит участников проекта
       api.get(`/projects/${projectIdFromUrl}`)
         .then(r => setUsers(r.data.members || []))
         .catch(() => {});
@@ -47,28 +64,61 @@ export default function CreateEditTaskPage() {
 
   const upd = f => e => setForm({ ...form, [f]: e.target.value });
 
+  // Добавляем выбранные файлы в список (без дублей по имени+размеру)
+  const onFilesSelected = (e) => {
+    const selected = Array.from(e.target.files);
+    setPendingFiles(prev => {
+      const existing = new Set(prev.map(f => f.name + f.size));
+      return [...prev, ...selected.filter(f => !existing.has(f.name + f.size))];
+    });
+    e.target.value = '';
+  };
+
+  const removeFile = (index) => setPendingFiles(prev => prev.filter((_, i) => i !== index));
+
+  // Загружаем все pendingFiles на задачу с данным taskId
+  const uploadFiles = async (taskId) => {
+    for (const file of pendingFiles) {
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        await api.post(`/tasks/${taskId}/attachments`, fd);
+      } catch {
+        toast.error(`Не удалось загрузить: ${file.name}`);
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = { ...form };
     if (!payload.assignee_id) delete payload.assignee_id;
     if (!payload.deadline)    delete payload.deadline;
     if (!payload.project_id)  delete payload.project_id;
+
+    setUploading(true);
     try {
       if (isEdit) {
         await api.put(`/tasks/${id}`, payload);
+        if (pendingFiles.length > 0) await uploadFiles(id);
         toast.success('Задача обновлена');
         navigate(`/tasks/${id}`);
       } else {
         const r = await api.post('/tasks', payload);
+        const newId = r.data.id;
+        if (pendingFiles.length > 0) await uploadFiles(newId);
         toast.success('Задача создана');
-        // Возвращаемся в проект, если создавали из проекта
         if (payload.project_id) {
           navigate(`/projects/${payload.project_id}`);
         } else {
-          navigate(`/tasks/${r.data.id}`);
+          navigate(`/tasks/${newId}`);
         }
       }
-    } catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Ошибка');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const backUrl = projectIdFromUrl ? `/projects/${projectIdFromUrl}` : (isEdit ? `/tasks/${id}` : '/tasks');
@@ -125,9 +175,46 @@ export default function CreateEditTaskPage() {
           <input type="number" min="0" value={form.reward_points} onChange={upd('reward_points')} placeholder="0" />
           <span className="reward-hint">Баллы начислятся только после подтверждения</span>
         </div>
+
+        {/* Вложения */}
+        <div className="form-group">
+          <label>📎 Вложения</label>
+          <div className="task-form-attachments">
+            {pendingFiles.length > 0 && (
+              <div className="task-form-file-list">
+                {pendingFiles.map((f, i) => (
+                  <div key={i} className="task-form-file-row">
+                    <span className="task-form-file-icon">{getFileIcon(f.type)}</span>
+                    <span className="task-form-file-name">{f.name}</span>
+                    <span className="task-form-file-size">{formatSize(f.size)}</span>
+                    <button type="button" className="task-form-file-remove" onClick={() => removeFile(i)}>×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="task-form-upload-btn">
+              + Добавить файл
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                style={{ display: 'none' }}
+                onChange={onFilesSelected}
+                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar,.7z"
+              />
+            </label>
+            <span className="reward-hint">Макс. 10 МБ на файл. jpg, png, pdf, doc, xls, zip и др.</span>
+          </div>
+        </div>
+
         <div className="form-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => navigate(backUrl)}>Отмена</button>
-          <button type="submit" className="btn btn-primary">{isEdit ? 'Сохранить' : 'Создать задачу'}</button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate(backUrl)} disabled={uploading}>Отмена</button>
+          <button type="submit" className="btn btn-primary" disabled={uploading}>
+            {uploading
+              ? (pendingFiles.length > 0 ? `Загрузка файлов...` : 'Сохранение...')
+              : (isEdit ? 'Сохранить' : 'Создать задачу')
+            }
+          </button>
         </div>
       </form>
     </div>
