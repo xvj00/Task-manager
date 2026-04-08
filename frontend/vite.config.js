@@ -8,4 +8,7 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
   },
+  optimizeDeps: {
+    include: ['docx-preview'],
+  },
 })

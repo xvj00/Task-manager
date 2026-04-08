@@ -43,11 +43,55 @@ class AdminController extends Controller
         return response()->json($user);
     }
 
-    public function destroyUser(Request $request, User $user)
+    public function blockUser(Request $request, User $user)
     {
         if (!$request->user()->isAdmin()) abort(403);
-        if ($user->id === $request->user()->id) abort(422, 'Нельзя удалить себя.');
-        $user->delete();
-        return response()->json(null, 204);
+        if ($user->id === $request->user()->id) abort(422, 'Нельзя заблокировать себя.');
+        $data = $request->validate([
+            'reason' => 'required|string|max:1000',
+        ], [
+            'reason.required' => 'Укажите причину блокировки.',
+        ]);
+        $user->update(['is_blocked' => true, 'block_reason' => $data['reason']]);
+        return response()->json($user);
+    }
+
+    public function unblockUser(Request $request, User $user)
+    {
+        if (!$request->user()->isAdmin()) abort(403);
+        $user->update([
+            'is_blocked'   => false,
+            'block_reason' => null,
+            'appeal_text'  => null,
+            'appeal_at'    => null,
+        ]);
+        return response()->json($user);
+    }
+
+    public function appeals(Request $request)
+    {
+        if (!$request->user()->isAdmin()) abort(403);
+        $users = User::whereNotNull('appeal_text')
+            ->select('id', 'name', 'username', 'email', 'is_blocked', 'block_reason', 'appeal_text', 'appeal_at', 'created_at')
+            ->get();
+        return response()->json($users);
+    }
+
+    public function submitAppeal(Request $request)
+    {
+        $user = $request->user();
+        if (!$user->is_blocked) abort(422, 'Вы не заблокированы.');
+        if ($user->appeal_at)   abort(422, 'Апелляция уже была подана.');
+
+        $data = $request->validate([
+            'text' => 'required|string|min:20|max:3000',
+        ], [
+            'text.required' => 'Текст апелляции обязателен.',
+            'text.min'      => 'Апелляция должна содержать не менее 20 символов.',
+            'text.max'      => 'Апелляция не должна превышать 3000 символов.',
+        ]);
+
+        $user->update(['appeal_text' => $data['text'], 'appeal_at' => now()]);
+        return response()->json(['message' => 'Апелляция подана. Ожидайте решения администратора.']);
     }
 }

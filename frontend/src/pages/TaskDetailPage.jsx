@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { renderAsync } from 'docx-preview';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
@@ -26,11 +27,14 @@ export default function TaskDetailPage() {
   const [newSubtask, setNewSubtask]       = useState('');
   const [newComment, setNewComment]       = useState('');
   const [subtasks, setSubtasks]           = useState([]);
-  const [previewFile, setPreviewFile]     = useState(null);
+  const [previewFiles, setPreviewFiles]   = useState([]); // [] | [f] | [f, f]
   const [panelWidth, setPanelWidth]       = useState(420);
-  const [zoom, setZoom]                   = useState(1);
-  const dragIndexRef  = useRef(null);
-  const isResizingRef = useRef(false);
+  const [splitRatio, setSplitRatio]       = useState(0.5); // доля верхней панели
+  const [isResizing, setIsResizing]       = useState(false);
+  const [isSplitResizing, setIsSplitResizing] = useState(false);
+  const dragIndexRef      = useRef(null);
+  const isResizingRef     = useRef(false);
+  const isSplitResizingRef = useRef(false);
   const fileRef = useRef();
 
   const load = async () => {
@@ -50,6 +54,7 @@ export default function TaskDetailPage() {
   const startResize = (e) => {
     e.preventDefault();
     isResizingRef.current = true;
+    setIsResizing(true);
     document.body.style.cursor = 'ew-resize';
     document.body.style.userSelect = 'none';
     const onMove = (ev) => {
@@ -59,6 +64,7 @@ export default function TaskDetailPage() {
     };
     const onUp = () => {
       isResizingRef.current = false;
+      setIsResizing(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       window.removeEventListener('mousemove', onMove);
@@ -68,9 +74,46 @@ export default function TaskDetailPage() {
     window.addEventListener('mouseup', onUp);
   };
 
-  const zoomIn  = () => setZoom(z => Math.min(+(z + 0.25).toFixed(2), 3));
-  const zoomOut = () => setZoom(z => Math.max(+(z - 0.25).toFixed(2), 0.25));
-  const zoomReset = () => setZoom(1);
+  const startSplitResize = (e) => {
+    e.preventDefault();
+    isSplitResizingRef.current = true;
+    setIsSplitResizing(true);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (ev) => {
+      if (!isSplitResizingRef.current) return;
+      const ratio = ev.clientY / window.innerHeight;
+      setSplitRatio(Math.min(Math.max(ratio, 0.15), 0.85));
+    };
+    const onUp = () => {
+      isSplitResizingRef.current = false;
+      setIsSplitResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const fileUrl    = (a) => `http://127.0.0.1:8001/storage/attachments/${a.filename}`;
+  const fileApiUrl = (a) => `http://127.0.0.1:8001/api/files/${a.filename}`;
+
+  const openFile = (file, e) => {
+    if (e.ctrlKey && previewFiles.length === 1 && previewFiles[0].id !== file.id) {
+      // Shift+клик — добавляем второй файл
+      setPreviewFiles([previewFiles[0], file]);
+    } else if (previewFiles.find(f => f.id === file.id)) {
+      // Клик на уже открытый — закрываем
+      setPreviewFiles(prev => prev.filter(f => f.id !== file.id));
+    } else {
+      // Обычный клик — заменяем всё
+      setPreviewFiles([file]);
+    }
+  };
+
+  const closeFile = (fileId) => setPreviewFiles(prev => prev.filter(f => f.id !== fileId));
 
   const handleTake    = async () => { try { await api.post(`/tasks/${id}/take`);   toast.success('Взяли в работу!');        load(); } catch (e) { toast.error(e.response?.data?.message || 'Ошибка'); } };
   const handleSubmit  = async () => { try { await api.post(`/tasks/${id}/submit`); toast.success('Отправлено на проверку!'); load(); } catch (e) { toast.error(e.response?.data?.message || 'Ошибка'); } };
@@ -135,13 +178,9 @@ export default function TaskDetailPage() {
   // Задача занята — посторонний пользователь может только смотреть
   const isLocked = !isAssignee && !canManage && task.status !== 'open';
 
-  const fileUrl = (a) => `http://127.0.0.1:8001/storage/attachments/${a.filename}`;
-  const isImage = (mime) => mime?.startsWith('image/');
-  const isPdf   = (mime) => mime === 'application/pdf';
-
   return (
-    <div className={`task-detail-layout ${previewFile ? 'with-preview' : ''}`}>
-    <div className="page page-narrow-lg" style={previewFile ? { marginRight: panelWidth + 8 } : {}}>
+    <div className={`task-detail-layout ${previewFiles.length > 0 ? 'with-preview' : ''}`}>
+    <div className="page page-narrow-lg" style={previewFiles.length > 0 ? { marginRight: panelWidth + 8 } : {}}>
       <div className="page-header">
         <button className="btn btn-ghost" onClick={() => navigate(task.project_id ? `/projects/${task.project_id}` : '/tasks')}>← Назад</button>
         {canManage && (
@@ -270,8 +309,8 @@ export default function TaskDetailPage() {
             {task.attachments?.map(a => (
               <div
                 key={a.id}
-                className={`attachment-row ${previewFile?.id === a.id ? 'active' : ''}`}
-                onClick={() => setPreviewFile(previewFile?.id === a.id ? null : a)}
+                className={`attachment-row ${previewFiles.find(f => f.id === a.id) ? 'active' : ''}`}
+                onClick={(e) => openFile(a, e)}
               >
                 <span className="attachment-icon">{getFileIcon(a.mime_type)}</span>
                 <span className="attachment-name">{a.original_name}</span>
@@ -344,56 +383,156 @@ export default function TaskDetailPage() {
       </div>
     </div>
 
-    {/* Панель предпросмотра файла справа */}
-    {previewFile && (
+    {/* Панель предпросмотра файлов справа */}
+    {previewFiles.length > 0 && (
       <div className="file-preview-panel" style={{ width: panelWidth }}>
-        {/* Ручка для растягивания влево */}
         <div className="file-preview-resize-handle" onMouseDown={startResize} />
 
+        <FilePreviewPane
+          key={previewFiles[0].id}
+          file={previewFiles[0]}
+          fileUrl={fileUrl}
+          fileApiUrl={fileApiUrl}
+          isResizing={isResizing || isSplitResizing}
+          paneStyle={previewFiles.length === 2
+            ? { height: `${splitRatio * 100}%`, flex: 'none' }
+            : { flex: 1 }}
+          onClose={() => closeFile(previewFiles[0].id)}
+          onAutoResize={(w) => {
+            if (previewFiles.length === 1)
+              setPanelWidth(Math.min(Math.max(w, 400), window.innerWidth - 340));
+          }}
+        />
+
+        {previewFiles.length === 2 && (
+          <>
+            {/* Вертикальный разделитель */}
+            <div className="file-preview-vsplit-handle" onMouseDown={startSplitResize} />
+
+            <FilePreviewPane
+              key={previewFiles[1].id}
+              file={previewFiles[1]}
+              fileUrl={fileUrl}
+              fileApiUrl={fileApiUrl}
+              isResizing={isResizing || isSplitResizing}
+              paneStyle={{ height: `${(1 - splitRatio) * 100}%`, flex: 'none' }}
+              onClose={() => closeFile(previewFiles[1].id)}
+              onAutoResize={() => {}}
+            />
+          </>
+        )}
+      </div>
+    )}
+    </div>
+  );
+}
+
+/* ── Независимая панель одного файла ── */
+function FilePreviewPane({ file, fileUrl, fileApiUrl, isResizing, paneStyle, onClose, onAutoResize }) {
+  const [zoom, setZoom]                   = useState(1);
+  const [imgFullscreen, setImgFullscreen] = useState(false);
+  const docxRef = useRef(null);
+
+  const isImage = (m) => m?.startsWith('image/');
+  const isPdf   = (m) => m === 'application/pdf';
+  const isDocx  = (m) => m === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || m === 'application/msword';
+
+  const zoomIn    = () => setZoom(z => Math.min(+(z + 0.25).toFixed(2), 3));
+  const zoomOut   = () => setZoom(z => Math.max(+(z - 0.25).toFixed(2), 0.25));
+  const zoomReset = () => setZoom(1);
+
+  // Рендер DOCX
+  useEffect(() => {
+    if (!isDocx(file.mime_type) || !docxRef.current) return;
+    docxRef.current.innerHTML = '<div style="padding:24px;color:#888">Загрузка документа...</div>';
+    fetch(fileApiUrl(file))
+      .then(r => r.blob())
+      .then(async blob => {
+        await renderAsync(blob, docxRef.current, null, {
+          className: 'docx-render',
+          inWrapper: true,
+          ignoreWidth: false,
+          ignoreHeight: false,
+          ignoreFonts: false,
+          breakPages: true,
+          useBase64URL: true,
+        });
+        requestAnimationFrame(() => {
+          const page = docxRef.current?.querySelector('.docx-wrapper > section, .docx');
+          const contentW = page ? page.scrollWidth : docxRef.current?.scrollWidth;
+          if (contentW) onAutoResize?.(contentW + 48);
+        });
+      })
+      .catch(() => {});
+  }, [file.id]);
+
+  // ESC закрывает полный экран
+  useEffect(() => {
+    const h = (e) => { if (e.key === 'Escape') setImgFullscreen(false); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
+  return (
+    <>
+      <div className="file-preview-pane" style={paneStyle}>
+        {/* Заголовок панели */}
         <div className="file-preview-header">
-          <span className="file-preview-title" title={previewFile.original_name}>
-            {getFileIcon(previewFile.mime_type)} {previewFile.original_name}
+          <span className="file-preview-title" title={file.original_name}>
+            {getFileIcon(file.mime_type)} {file.original_name}
           </span>
           <div className="file-preview-actions">
-            {/* Зум — только для изображений и PDF */}
-            {(isImage(previewFile.mime_type) || isPdf(previewFile.mime_type)) && (
+            {(isImage(file.mime_type) || isPdf(file.mime_type)) && (
               <div className="file-preview-zoom">
-                <button className="zoom-btn" onClick={zoomOut} title="Уменьшить">−</button>
-                <span className="zoom-value" onClick={zoomReset} title="Сбросить масштаб">{Math.round(zoom * 100)}%</span>
-                <button className="zoom-btn" onClick={zoomIn} title="Увеличить">+</button>
+                <button className="zoom-btn" onClick={zoomOut}>−</button>
+                <span className="zoom-value" onClick={zoomReset}>{Math.round(zoom * 100)}%</span>
+                <button className="zoom-btn" onClick={zoomIn}>+</button>
               </div>
             )}
-            <a
-              href={fileUrl(previewFile)}
-              download={previewFile.original_name}
-              className="btn btn-secondary btn-sm"
-              onClick={e => e.stopPropagation()}
-            >⬇ Скачать</a>
-            <button className="file-preview-close" onClick={() => { setPreviewFile(null); setZoom(1); }}>×</button>
+            {isImage(file.mime_type) && (
+              <button className="btn btn-secondary btn-sm" onClick={() => setImgFullscreen(true)} title="Полный экран">⛶</button>
+            )}
+            <a href={fileUrl(file)} download={file.original_name} className="btn btn-secondary btn-sm">⬇</a>
+            <button className="file-preview-close" onClick={onClose}>×</button>
           </div>
         </div>
 
+        {/* Тело */}
         <div className="file-preview-body">
-          {isImage(previewFile.mime_type) ? (
+          {isImage(file.mime_type) ? (
             <div className="file-preview-zoom-wrap" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
-              <img src={fileUrl(previewFile)} alt={previewFile.original_name} className="file-preview-img" />
+              <img src={fileUrl(file)} alt={file.original_name} className="file-preview-img" />
             </div>
-          ) : isPdf(previewFile.mime_type) ? (
-            <div style={{ width: '100%', height: '100%', transform: `scale(${zoom})`, transformOrigin: 'top center', transition: 'transform .15s' }}>
-              <iframe src={fileUrl(previewFile)} title={previewFile.original_name} className="file-preview-iframe" />
+          ) : isPdf(file.mime_type) ? (
+            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+              {isResizing && <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'ew-resize' }} />}
+              <iframe
+                src={`${fileUrl(file)}#zoom=${Math.round(zoom * 100)}&toolbar=1&navpanes=1`}
+                title={file.original_name}
+                className="file-preview-iframe"
+              />
             </div>
+          ) : isDocx(file.mime_type) ? (
+            <div ref={docxRef} className="file-preview-docx" />
           ) : (
             <div className="file-preview-fallback">
-              <div className="file-preview-big-icon">{getFileIcon(previewFile.mime_type)}</div>
-              <div className="file-preview-fallback-name">{previewFile.original_name}</div>
-              <div className="file-preview-fallback-size">{formatSize(previewFile.size)}</div>
-              <a href={fileUrl(previewFile)} download={previewFile.original_name} className="btn btn-primary">⬇ Скачать файл</a>
+              <div className="file-preview-big-icon">{getFileIcon(file.mime_type)}</div>
+              <div className="file-preview-fallback-name">{file.original_name}</div>
+              <div className="file-preview-fallback-size">{formatSize(file.size)}</div>
+              <a href={fileUrl(file)} download={file.original_name} className="btn btn-primary">⬇ Скачать файл</a>
             </div>
           )}
         </div>
       </div>
-    )}
-    </div>
+
+      {/* Полноэкранный просмотр */}
+      {imgFullscreen && (
+        <div className="img-fullscreen-overlay" onClick={() => setImgFullscreen(false)}>
+          <button className="img-fullscreen-close" onClick={() => setImgFullscreen(false)}>×</button>
+          <img src={fileUrl(file)} alt={file.original_name} className="img-fullscreen-img" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+    </>
   );
 }
 

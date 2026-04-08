@@ -11,15 +11,16 @@ class FolderController extends Controller
     {
         $user = $request->user();
 
-        $folders = Folder::with(['owner', 'members'])
-            ->where(function ($q) use ($user) {
+        $query = Folder::with(['owner', 'members'])->withCount('projects');
+
+        if (!$user->isAdmin()) {
+            $query->where(function ($q) use ($user) {
                 $q->where('owner_id', $user->id)
                   ->orWhereHas('members', fn($m) => $m->where('user_id', $user->id));
-            })
-            ->withCount('projects')
-            ->get();
+            });
+        }
 
-        return response()->json($folders);
+        return response()->json($query->get());
     }
 
     public function store(Request $request)

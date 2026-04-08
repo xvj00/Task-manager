@@ -37,6 +37,15 @@ class TaskAttachmentController extends Controller
         return response()->json($attachment->load('user'), 201);
     }
 
+    public function serve(Request $request, string $filename)
+    {
+        $path = storage_path("app/public/attachments/{$filename}");
+        if (!file_exists($path)) abort(404);
+        return response()->file($path, [
+            'Access-Control-Allow-Origin' => '*',
+        ]);
+    }
+
     public function destroy(Request $request, Task $task, TaskAttachment $attachment)
     {
         if ($attachment->user_id !== $request->user()->id && !$request->user()->isCreator()) {

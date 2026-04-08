@@ -17,10 +17,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
+Route::get ('/files/{filename}', [TaskAttachmentController::class, 'serve']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get ('/me',     [AuthController::class, 'me']);
+    Route::post('/appeal', [AdminController::class, 'submitAppeal']);
+
+    Route::middleware('check.not.blocked')->group(function () {
 
     // Folders
     Route::get   ('/folders',                              [FolderController::class, 'index']);
@@ -98,8 +102,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/invitations/{invitation}/decline', [InvitationController::class, 'decline']);
 
     // Admin
-    Route::get   ('/admin/stats',        [AdminController::class, 'stats']);
-    Route::get   ('/admin/users',        [AdminController::class, 'users']);
-    Route::put   ('/admin/users/{user}', [AdminController::class, 'updateUser']);
-    Route::delete('/admin/users/{user}', [AdminController::class, 'destroyUser']);
+    Route::get ('/admin/stats',              [AdminController::class, 'stats']);
+    Route::get ('/admin/users',              [AdminController::class, 'users']);
+    Route::put ('/admin/users/{user}',       [AdminController::class, 'updateUser']);
+    Route::put ('/admin/users/{user}/block', [AdminController::class, 'blockUser']);
+    Route::put ('/admin/users/{user}/unblock', [AdminController::class, 'unblockUser']);
+    Route::get ('/admin/appeals',            [AdminController::class, 'appeals']);
+
+    }); // end check.not.blocked
 });
