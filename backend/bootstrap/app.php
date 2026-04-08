@@ -13,7 +13,6 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: ['api/*']);
-        $middleware->appendToGroup('api', \App\Http\Middleware\UpdateLastSeen::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
