@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
+import useAuthStore from '../store/authStore';
 
 export default function FoldersPage() {
+  const { user } = useAuthStore();
   const [folders, setFolders] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', description: '' });
+  const [search, setSearch] = useState('');
 
   const load = () => api.get('/folders').then(r => setFolders(r.data)).catch(() => {});
   useEffect(() => { load(); }, []);
@@ -27,6 +30,16 @@ export default function FoldersPage() {
     try { await api.delete(`/folders/${id}`); toast.success('Папка удалена'); load(); }
     catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
   };
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    if (!q) return folders;
+    return folders.filter(f =>
+      f.name?.toLowerCase().includes(q) ||
+      f.description?.toLowerCase().includes(q) ||
+      f.owner?.name?.toLowerCase().includes(q)
+    );
+  }, [folders, search]);
 
   return (
     <div className="page">
@@ -53,9 +66,20 @@ export default function FoldersPage() {
         </form>
       )}
 
+      <div className="toolbar" style={{ marginBottom: 20 }}>
+        <input
+          className="search-input"
+          placeholder="🔍 Поиск по названию, описанию, владельцу..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && <span className="admin-filter-count">{filtered.length} из {folders.length}</span>}
+      </div>
+
       <div className="folders-grid">
         {folders.length === 0 && <p className="empty-state-big">📁 Папок пока нет</p>}
-        {folders.map(f => (
+        {filtered.length === 0 && folders.length > 0 && <p className="empty-state-big">🔍 Ничего не найдено</p>}
+        {filtered.map(f => (
           <div key={f.id} className="folder-card">
             <div className="folder-icon">📁</div>
             <div className="folder-info">

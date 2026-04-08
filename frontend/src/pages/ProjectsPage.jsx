@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
@@ -9,6 +9,8 @@ export default function ProjectsPage() {
   const [folders, setFolders] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', folder_id: '' });
+  const [search, setSearch] = useState('');
+  const [filterFolder, setFilterFolder] = useState('');
 
   const load = () => {
     api.get('/projects').then(r => setProjects(r.data)).catch(() => {});
@@ -32,6 +34,21 @@ export default function ProjectsPage() {
     try { await api.delete(`/projects/${id}`); toast.success('Проект удалён'); load(); }
     catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
   };
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return projects.filter(p => {
+      const matchSearch = !q ||
+        p.name?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q) ||
+        p.owner?.name?.toLowerCase().includes(q) ||
+        p.folder?.name?.toLowerCase().includes(q);
+      const matchFolder = !filterFolder ||
+        String(p.folder_id) === filterFolder ||
+        (filterFolder === '__none__' && !p.folder_id);
+      return matchSearch && matchFolder;
+    });
+  }, [projects, search, filterFolder]);
 
   return (
     <div className="page">
@@ -65,9 +82,31 @@ export default function ProjectsPage() {
         </form>
       )}
 
+      <div className="toolbar" style={{ marginBottom: 20 }}>
+        <input
+          className="search-input"
+          placeholder="🔍 Поиск по названию, описанию, владельцу, папке..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        <select
+          className="admin-filter-select"
+          value={filterFolder}
+          onChange={e => setFilterFolder(e.target.value)}
+        >
+          <option value="">Все папки</option>
+          <option value="__none__">Без папки</option>
+          {folders.map(f => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
+        </select>
+        {(search || filterFolder) && (
+          <span className="admin-filter-count">{filtered.length} из {projects.length}</span>
+        )}
+      </div>
+
       <div className="projects-list">
         {projects.length === 0 && <p className="empty-state-big">🗂 Проектов пока нет</p>}
-        {projects.map(p => (
+        {filtered.length === 0 && projects.length > 0 && <p className="empty-state-big">🔍 Ничего не найдено</p>}
+        {filtered.map(p => (
           <div key={p.id} className="project-card">
             <div className="project-card-left">
               <div className="project-card-icon">🗂</div>

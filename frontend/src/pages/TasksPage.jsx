@@ -52,7 +52,7 @@ export default function TasksPage() {
     <div className="page">
       <div className="page-header">
         <h1>Задачи</h1>
-        {user?.role === 'creator' && (
+        {user?.role === 'admin' && (
           <Link to="/tasks/new" className="btn btn-primary">+ Новая задача</Link>
         )}
       </div>
@@ -145,10 +145,10 @@ function TaskRow({ task, onUpdate, user }) {
         {task.assignee && <span className="assignee-chip">👤 {task.assignee.name}</span>}
         {task.deadline && <span className="deadline-chip">📅 {new Date(task.deadline).toLocaleDateString('ru-RU')}</span>}
         {task.reward_points > 0 && <span className="reward-chip">💰 {task.reward_points}</span>}
-        {user?.role === 'executor' && task.status === 'open' && (
+        {user?.role !== 'admin' && task.status === 'open' && task.assignee_id !== user?.id && (
           <button className="btn btn-primary btn-xs" onClick={handleTake}>Взять в работу</button>
         )}
-        {user?.role === 'executor' && task.status === 'in_progress' && task.assignee_id === user.id && (
+        {user?.role !== 'admin' && task.status === 'in_progress' && task.assignee_id === user?.id && (
           <button className="btn btn-success btn-xs" onClick={handleSubmit}>Выполнено ✓</button>
         )}
       </div>
