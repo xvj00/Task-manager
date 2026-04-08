@@ -15,8 +15,9 @@ class UpdateLastSeen
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($user = $request->user()) {
-            // Обновляем не чаще раза в минуту чтобы не нагружать БД
+        // Явно используем sanctum-гард, т.к. middleware запускается до auth:sanctum
+        $user = $request->user('sanctum');
+        if ($user) {
             if (!$user->last_seen_at || now()->diffInSeconds($user->last_seen_at) > 60) {
                 $user->updateQuietly(['last_seen_at' => now()]);
             }
