@@ -132,6 +132,9 @@ export default function TaskDetailPage() {
     : false;
   const canManage = user?.role === 'admin' || isProjectManager || task.creator_id === user?.id;
 
+  // Задача занята — посторонний пользователь может только смотреть
+  const isLocked = !isAssignee && !canManage && task.status !== 'open';
+
   const fileUrl = (a) => `http://127.0.0.1:8001/storage/attachments/${a.filename}`;
   const isImage = (mime) => mime?.startsWith('image/');
   const isPdf   = (mime) => mime === 'application/pdf';
@@ -149,6 +152,17 @@ export default function TaskDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Баннер блокировки */}
+      {isLocked && (
+        <div className="task-locked-banner">
+          <span className="task-locked-icon">🔒</span>
+          <div>
+            <div className="task-locked-title">Задача уже в работе</div>
+            <div className="task-locked-sub">Исполнитель: <strong>{task.assignee?.name}</strong> — вы можете смотреть, но не редактировать</div>
+          </div>
+        </div>
+      )}
 
       <div className="task-detail-card">
         <div className="task-detail-header">
@@ -187,27 +201,29 @@ export default function TaskDetailPage() {
               <div className="subtasks-bar-fill" style={{ width: `${(doneCount / totalCount) * 100}%` }} />
             </div>
           )}
-          <div className="subtasks-list">
+          <div className={`subtasks-list ${isLocked ? 'locked-section' : ''}`}>
             {subtasks.map((s, index) => (
               <div
                 key={s.id}
                 className={`subtask-row ${s.is_done ? 'done' : ''}`}
-                draggable
-                onDragStart={() => onDragStart(index)}
-                onDragOver={(e) => onDragOver(e, index)}
-                onDrop={onDragEnd}
+                draggable={!isLocked}
+                onDragStart={!isLocked ? () => onDragStart(index) : undefined}
+                onDragOver={!isLocked ? (e) => onDragOver(e, index) : undefined}
+                onDrop={!isLocked ? onDragEnd : undefined}
               >
-                <span className="subtask-drag-handle" title="Перетащить">⠿</span>
-                <input type="checkbox" checked={s.is_done} onChange={() => toggleSubtask(s)} />
+                {!isLocked && <span className="subtask-drag-handle" title="Перетащить">⠿</span>}
+                <input type="checkbox" checked={s.is_done} disabled={isLocked} onChange={() => !isLocked && toggleSubtask(s)} />
                 <span className="subtask-title">{s.title}</span>
-                <button className="subtask-del" onClick={() => deleteSubtask(s.id)}>×</button>
+                {!isLocked && <button className="subtask-del" onClick={() => deleteSubtask(s.id)}>×</button>}
               </div>
             ))}
           </div>
-          <form onSubmit={addSubtask} className="subtask-add-form">
-            <input type="text" value={newSubtask} onChange={e => setNewSubtask(e.target.value)} placeholder="Добавить подзадачу..." />
-            <button type="submit" className="btn btn-secondary btn-sm">+</button>
-          </form>
+          {!isLocked && (
+            <form onSubmit={addSubtask} className="subtask-add-form">
+              <input type="text" value={newSubtask} onChange={e => setNewSubtask(e.target.value)} placeholder="Добавить подзадачу..." />
+              <button type="submit" className="btn btn-secondary btn-sm">+</button>
+            </form>
+          )}
         </div>
 
         {/* Действия исполнителя — видны всем кроме менеджеров проекта (если только они не сами исполнитель) */}
@@ -246,7 +262,10 @@ export default function TaskDetailPage() {
 
         {/* Вложения */}
         <div className="attachments-block">
-          <div className="block-label">Вложения ({task.attachments?.length ?? 0})</div>
+          <div className="block-label">
+            Вложения ({task.attachments?.length ?? 0})
+            {isLocked && <span className="locked-hint">👁 только просмотр</span>}
+          </div>
           <div className="attachments-list">
             {task.attachments?.map(a => (
               <div
@@ -257,14 +276,18 @@ export default function TaskDetailPage() {
                 <span className="attachment-icon">{getFileIcon(a.mime_type)}</span>
                 <span className="attachment-name">{a.original_name}</span>
                 <span className="attachment-size">{formatSize(a.size)}</span>
-                <button className="btn btn-danger btn-xs" onClick={(e) => { e.stopPropagation(); deleteAttachment(a.id); }}>×</button>
+                {!isLocked && (
+                  <button className="btn btn-danger btn-xs" onClick={(e) => { e.stopPropagation(); deleteAttachment(a.id); }}>×</button>
+                )}
               </div>
             ))}
           </div>
-          <label className="btn btn-secondary btn-sm upload-btn" style={{ cursor: 'pointer', display: 'inline-flex' }}>
-            📎 Прикрепить файл
-            <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={uploadFile} />
-          </label>
+          {!isLocked && (
+            <label className="btn btn-secondary btn-sm upload-btn" style={{ cursor: 'pointer', display: 'inline-flex' }}>
+              📎 Прикрепить файл
+              <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={uploadFile} />
+            </label>
+          )}
         </div>
 
         {/* Комментарии */}
@@ -279,7 +302,7 @@ export default function TaskDetailPage() {
                   <div className="comment-header">
                     <span className="comment-author">{c.user?.name}</span>
                     <span className="comment-date">{new Date(c.created_at).toLocaleString('ru-RU')}</span>
-                    {(c.user_id === user?.id || canManage) && (
+                    {!isLocked && (c.user_id === user?.id || canManage) && (
                       <button className="comment-del" onClick={() => deleteComment(c.id)}>×</button>
                     )}
                   </div>
@@ -288,10 +311,16 @@ export default function TaskDetailPage() {
               </div>
             ))}
           </div>
-          <form onSubmit={addComment} className="comment-add-form">
-            <textarea value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Написать комментарий..." rows={2} />
-            <button type="submit" className="btn btn-primary btn-sm">Отправить</button>
-          </form>
+          {isLocked ? (
+            <div className="comment-locked-placeholder">
+              🔒 Оставлять комментарии может только исполнитель задачи
+            </div>
+          ) : (
+            <form onSubmit={addComment} className="comment-add-form">
+              <textarea value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Написать комментарий..." rows={2} />
+              <button type="submit" className="btn btn-primary btn-sm">Отправить</button>
+            </form>
+          )}
         </div>
 
         {/* История */}

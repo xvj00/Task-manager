@@ -196,6 +196,17 @@ a{text-decoration:none;color:inherit;}
 .block-label{font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;}
 .task-description-text{font-size:14px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;background:var(--surface-2);border:1px solid var(--border-light);border-radius:var(--radius);padding:14px;}
 .rejection-block{background:var(--danger-light);border:1px solid #fca5a5;border-radius:var(--radius);padding:12px 16px;font-size:14px;color:#991b1b;margin-bottom:16px;}
+
+/* Locked task */
+.task-locked-banner{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:16px;color:#fff;box-shadow:0 4px 20px rgba(49,46,129,.35);}
+.task-locked-icon{font-size:28px;flex-shrink:0;animation:lockPulse 2.5s ease-in-out infinite;}
+@keyframes lockPulse{0%,100%{transform:scale(1);opacity:.9;}50%{transform:scale(1.12);opacity:1;}}
+.task-locked-title{font-size:15px;font-weight:700;margin-bottom:3px;}
+.task-locked-sub{font-size:13px;opacity:.75;}
+.locked-section{position:relative;border-radius:var(--radius);overflow:hidden;}
+.locked-section::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(45deg,transparent,transparent 6px,rgba(148,163,184,.07) 6px,rgba(148,163,184,.07) 12px);pointer-events:none;border-radius:var(--radius);}
+.locked-hint{font-size:11px;font-weight:500;color:var(--text-muted);margin-left:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:2px 8px;}
+.comment-locked-placeholder{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;background:var(--surface-2);border:1px dashed var(--border);border-radius:var(--radius);font-size:13px;color:var(--text-muted);margin-top:10px;}
 .task-actions{display:flex;gap:10px;margin:20px 0;padding-top:16px;border-top:1px solid var(--border-light);}
 .review-panel{background:var(--warning-light);border:1px solid #fcd34d;border-radius:var(--radius-lg);padding:20px;margin:20px 0;}
 .review-panel h3{font-size:15px;font-weight:700;margin-bottom:14px;}
