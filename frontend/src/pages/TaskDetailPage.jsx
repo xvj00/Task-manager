@@ -27,7 +27,10 @@ export default function TaskDetailPage() {
   const [newComment, setNewComment]       = useState('');
   const [subtasks, setSubtasks]           = useState([]);
   const [previewFile, setPreviewFile]     = useState(null);
-  const dragIndexRef = useRef(null);
+  const [panelWidth, setPanelWidth]       = useState(420);
+  const [zoom, setZoom]                   = useState(1);
+  const dragIndexRef  = useRef(null);
+  const isResizingRef = useRef(false);
   const fileRef = useRef();
 
   const load = async () => {
@@ -42,6 +45,32 @@ export default function TaskDetailPage() {
     }
   };
   useEffect(() => { load(); }, [id]);
+
+  // Resize панели: тащим левый край
+  const startResize = (e) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+    const onMove = (ev) => {
+      if (!isResizingRef.current) return;
+      const newW = window.innerWidth - ev.clientX;
+      setPanelWidth(Math.min(Math.max(newW, 280), window.innerWidth - 340));
+    };
+    const onUp = () => {
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const zoomIn  = () => setZoom(z => Math.min(+(z + 0.25).toFixed(2), 3));
+  const zoomOut = () => setZoom(z => Math.max(+(z - 0.25).toFixed(2), 0.25));
+  const zoomReset = () => setZoom(1);
 
   const handleTake    = async () => { try { await api.post(`/tasks/${id}/take`);   toast.success('Взяли в работу!');        load(); } catch (e) { toast.error(e.response?.data?.message || 'Ошибка'); } };
   const handleSubmit  = async () => { try { await api.post(`/tasks/${id}/submit`); toast.success('Отправлено на проверку!'); load(); } catch (e) { toast.error(e.response?.data?.message || 'Ошибка'); } };
@@ -109,7 +138,7 @@ export default function TaskDetailPage() {
 
   return (
     <div className={`task-detail-layout ${previewFile ? 'with-preview' : ''}`}>
-    <div className="page page-narrow-lg">
+    <div className="page page-narrow-lg" style={previewFile ? { marginRight: panelWidth + 8 } : {}}>
       <div className="page-header">
         <button className="btn btn-ghost" onClick={() => navigate(task.project_id ? `/projects/${task.project_id}` : '/tasks')}>← Назад</button>
         {canManage && (
@@ -288,26 +317,42 @@ export default function TaskDetailPage() {
 
     {/* Панель предпросмотра файла справа */}
     {previewFile && (
-      <div className="file-preview-panel">
+      <div className="file-preview-panel" style={{ width: panelWidth }}>
+        {/* Ручка для растягивания влево */}
+        <div className="file-preview-resize-handle" onMouseDown={startResize} />
+
         <div className="file-preview-header">
           <span className="file-preview-title" title={previewFile.original_name}>
             {getFileIcon(previewFile.mime_type)} {previewFile.original_name}
           </span>
           <div className="file-preview-actions">
+            {/* Зум — только для изображений и PDF */}
+            {(isImage(previewFile.mime_type) || isPdf(previewFile.mime_type)) && (
+              <div className="file-preview-zoom">
+                <button className="zoom-btn" onClick={zoomOut} title="Уменьшить">−</button>
+                <span className="zoom-value" onClick={zoomReset} title="Сбросить масштаб">{Math.round(zoom * 100)}%</span>
+                <button className="zoom-btn" onClick={zoomIn} title="Увеличить">+</button>
+              </div>
+            )}
             <a
               href={fileUrl(previewFile)}
               download={previewFile.original_name}
               className="btn btn-secondary btn-sm"
               onClick={e => e.stopPropagation()}
             >⬇ Скачать</a>
-            <button className="file-preview-close" onClick={() => setPreviewFile(null)}>×</button>
+            <button className="file-preview-close" onClick={() => { setPreviewFile(null); setZoom(1); }}>×</button>
           </div>
         </div>
+
         <div className="file-preview-body">
           {isImage(previewFile.mime_type) ? (
-            <img src={fileUrl(previewFile)} alt={previewFile.original_name} className="file-preview-img" />
+            <div className="file-preview-zoom-wrap" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}>
+              <img src={fileUrl(previewFile)} alt={previewFile.original_name} className="file-preview-img" />
+            </div>
           ) : isPdf(previewFile.mime_type) ? (
-            <iframe src={fileUrl(previewFile)} title={previewFile.original_name} className="file-preview-iframe" />
+            <div style={{ width: '100%', height: '100%', transform: `scale(${zoom})`, transformOrigin: 'top center', transition: 'transform .15s' }}>
+              <iframe src={fileUrl(previewFile)} title={previewFile.original_name} className="file-preview-iframe" />
+            </div>
           ) : (
             <div className="file-preview-fallback">
               <div className="file-preview-big-icon">{getFileIcon(previewFile.mime_type)}</div>
