@@ -197,6 +197,21 @@ class ProjectController extends Controller
         return response()->json(null, 204);
     }
 
+    public function leaderboard(Request $request, Project $project)
+    {
+        $this->checkAccess($request->user(), $project);
+
+        $members = $project->members()
+            ->withCount(['tasks as completed_tasks' => function ($q) use ($project) {
+                $q->where('project_id', $project->id)->where('status', 'done');
+            }])
+            ->orderByDesc('completed_tasks')
+            ->orderByDesc('balance')
+            ->get(['users.id', 'users.name', 'users.username', 'users.balance']);
+
+        return response()->json($members);
+    }
+
     private function checkAccess($user, Project $project): void
     {
         if ($user->isAdmin()) return;

@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Coins, TrendingUp, TrendingDown } from 'lucide-react';
 import api from '../api/axios';
-import useAuthStore from '../store/authStore';
 
 export default function BalancePage() {
-  const { user } = useAuthStore();
   const [data, setData] = useState({ balance: 0, transactions: [] });
 
   useEffect(() => {
@@ -11,37 +10,58 @@ export default function BalancePage() {
   }, []);
 
   return (
-    <div className="page">
-      <div className="page-header"><h1>💰 Мой баланс</h1></div>
-
-      <div className="balance-hero">
-        <div className="balance-amount">{data.balance}</div>
-        <div className="balance-label">баллов</div>
+    <div>
+      <div className="page-header">
+        <div className="page-title"><Coins size={18} />Мой баланс</div>
       </div>
 
-      <div className="transactions-section">
-        <h2>История транзакций</h2>
-        {data.transactions.length === 0
-          ? <p className="empty-state-big">📭 История пуста</p>
-          : (
-            <div className="transactions-list">
+      <div className="detail-card" style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ fontSize: 36, fontWeight: 600, color: '#92400e', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
+          <Coins size={28} color="var(--amber)" />{data.balance}
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text3)' }}>баллов на счёте</div>
+      </div>
+
+      <div className="section-title" style={{ marginBottom: 12 }}>История транзакций</div>
+
+      {data.transactions.length === 0 ? (
+        <div className="empty-state">История пуста</div>
+      ) : (
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Тип</th>
+                <th>Описание</th>
+                <th>Задача</th>
+                <th>Дата</th>
+                <th>Сумма</th>
+              </tr>
+            </thead>
+            <tbody>
               {data.transactions.map(tx => (
-                <div key={tx.id} className={`tx-row ${tx.type}`}>
-                  <div className="tx-icon">{tx.type === 'credit' ? '💚' : '🔴'}</div>
-                  <div className="tx-body">
-                    <div className="tx-desc">{tx.description}</div>
-                    {tx.task && <div className="tx-task">Задача: {tx.task.title}</div>}
-                    <div className="tx-date">{new Date(tx.created_at).toLocaleString('ru-RU')}</div>
-                  </div>
-                  <div className={`tx-amount ${tx.type}`}>
+                <tr key={tx.id}>
+                  <td>
+                    {tx.type === 'credit' ? (
+                      <TrendingUp size={14} color="var(--emerald)" />
+                    ) : (
+                      <TrendingDown size={14} color="var(--rose)" />
+                    )}
+                  </td>
+                  <td style={{ fontSize: 13 }}>{tx.description}</td>
+                  <td style={{ fontSize: 12, color: 'var(--text2)' }}>{tx.task?.title || '—'}</td>
+                  <td style={{ fontSize: 12, color: 'var(--text2)' }}>
+                    {new Date(tx.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                  <td style={{ fontSize: 13, fontWeight: 500, color: tx.type === 'credit' ? 'var(--emerald)' : 'var(--rose)' }}>
                     {tx.type === 'credit' ? '+' : '-'}{tx.amount}
-                  </div>
-                </div>
+                  </td>
+                </tr>
               ))}
-            </div>
-          )
-        }
-      </div>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

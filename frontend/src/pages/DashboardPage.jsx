@@ -1,130 +1,139 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Users, ClipboardList, Clock, CircleCheck, Coins, CalendarClock, Flame, Plus, LayoutDashboard } from 'lucide-react';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
 
-const STATUS_META = {
-  open:        { label: '📋 Открыта',       cls: 'open'        },
-  in_progress: { label: '🔄 В процессе',    cls: 'in_progress' },
-  review:      { label: '✅ На проверке',   cls: 'review'      },
-  done:        { label: '🏆 Выполнена',     cls: 'done'        },
-  rejected:    { label: '❌ Отклонена',     cls: 'rejected'    },
-  archive:     { label: '🗄 Архив',         cls: 'archive'     },
+const STATUS_CLS = {
+  open: 'badge-open', in_progress: 'badge-progress', review: 'badge-review',
+  done: 'badge-done', rejected: 'badge-rejected', archive: 'badge-archive',
+};
+const STATUS_LABEL = {
+  open: 'Открыта', in_progress: 'В процессе', review: 'На проверке',
+  done: 'Выполнена', rejected: 'Отклонена', archive: 'Архив',
 };
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
-  const [tasks, setTasks] = useState([]);
-  const [stats, setStats] = useState(null);
+  const [tasks, setTasks]   = useState([]);
+  const [stats, setStats]   = useState(null);
 
   useEffect(() => {
     api.get('/tasks').then(r => setTasks(r.data)).catch(() => {});
-    if (isAdmin) {
-      api.get('/admin/stats').then(r => setStats(r.data)).catch(() => {});
-    }
+    if (isAdmin) api.get('/admin/stats').then(r => setStats(r.data)).catch(() => {});
   }, [user]);
 
-  // Мои задачи — назначенные лично мне
-  const myTasks = tasks.filter(t => t.assignee_id === user?.id);
-
-  // Задачи на проверке (видны только admin)
   const reviewTasks = tasks.filter(t => t.status === 'review');
-
-  // Дедлайн сегодня — из назначенных мне или всех (для admin)
-  const todayTasks = tasks.filter(t => {
+  const myTasks     = tasks.filter(t => t.assignee_id === user?.id);
+  const todayTasks  = tasks.filter(t => {
     if (!t.deadline) return false;
     if (!isAdmin && t.assignee_id !== user?.id) return false;
-    const d = new Date(t.deadline);
-    const today = new Date();
-    return d.toDateString() === today.toDateString();
+    return new Date(t.deadline).toDateString() === new Date().toDateString();
   });
-
-  // Активные задачи
   const activeTasks = tasks.filter(t => ['open', 'in_progress'].includes(t.status));
 
   return (
-    <div className="page">
+    <div>
+      {/* Header */}
       <div className="page-header">
         <div>
-          <h1>Привет, {user?.name}! {isAdmin ? '👑' : '⚡'}</h1>
-          <p className="page-subtitle">
-            {isAdmin ? 'Панель управления заданиями' : `Ваш баланс: ${user?.balance ?? 0} баллов`}
-          </p>
+          <div className="page-title"><LayoutDashboard size={18} />Привет, {user?.name}!</div>
+          <div className="page-sub">{isAdmin ? 'Панель управления заданиями' : `Ваш баланс: ${user?.balance ?? 0} баллов`}</div>
         </div>
         {isAdmin && (
-          <Link to="/tasks/new" className="btn btn-primary">+ Новая задача</Link>
+          <Link to="/tasks/new" className="btn btn-primary">
+            <Plus size={14} /> Новая задача
+          </Link>
         )}
       </div>
 
-      {/* Статистика для admin */}
+      {/* Stats (только admin) */}
       {isAdmin && stats && (
         <div className="stats-grid">
-          {[
-            { icon: '👥', val: stats.users,         label: 'Пользователей' },
-            { icon: '📋', val: stats.tasks_total,   label: 'Всего задач'   },
-            { icon: '⏳', val: stats.tasks_review,  label: 'На проверке'   },
-            { icon: '✅', val: stats.tasks_done,    label: 'Выполнено'     },
-            { icon: '💰', val: stats.points_issued, label: 'Баллов выдано' },
-          ].map(s => (
-            <div key={s.label} className="stat-card">
-              <div className="stat-icon">{s.icon}</div>
-              <div className="stat-value">{s.val}</div>
-              <div className="stat-label">{s.label}</div>
-            </div>
-          ))}
+          <div className="stat-card">
+            <div className="stat-icon"><Users size={18} /></div>
+            <div className="stat-label">Пользователей</div>
+            <div className="stat-value">{stats.users}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"><ClipboardList size={18} /></div>
+            <div className="stat-label">Всего задач</div>
+            <div className="stat-value">{stats.tasks_total}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"><Clock size={18} /></div>
+            <div className="stat-label">На проверке</div>
+            <div className="stat-value">{stats.tasks_review}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"><CircleCheck size={18} color="var(--emerald)" /></div>
+            <div className="stat-label">Выполнено</div>
+            <div className="stat-value">{stats.tasks_done}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-icon"><Coins size={18} color="var(--amber)" /></div>
+            <div className="stat-label">Баллов выдано</div>
+            <div className="stat-value">{stats.points_issued >= 1000 ? `${(stats.points_issued / 1000).toFixed(0)}k` : stats.points_issued}</div>
+          </div>
         </div>
       )}
 
-      <div className="dashboard-cols">
-        {/* Задачи на проверке (только admin) */}
-        {isAdmin && (
-          <div className="dash-section">
-            <div className="dash-section-header">
-              <h2>На проверке {reviewTasks.length > 0 && <span className="badge-count">{reviewTasks.length}</span>}</h2>
-              <Link to="/tasks?status=review" className="link-more">Все</Link>
-            </div>
+      {/* На проверке (admin) */}
+      {isAdmin && (
+        <div className="section">
+          <div className="section-header">
+            <span className="section-title"><Clock size={14} />На проверке</span>
+            <Link to="/tasks?status=review" className="see-all">Все →</Link>
+          </div>
+          <div className="tasks-list">
             {reviewTasks.length === 0
-              ? <p className="empty-state">🎉 Нет задач на проверке</p>
-              : reviewTasks.slice(0, 5).map(t => <TaskCard key={t.id} task={t} />)
+              ? <div className="empty-state">Нет задач на проверке</div>
+              : reviewTasks.slice(0, 5).map(t => <TaskMini key={t.id} task={t} />)
             }
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Мои задачи (для обычного пользователя) */}
-        {!isAdmin && (
-          <div className="dash-section">
-            <div className="dash-section-header">
-              <h2>Мои задачи {myTasks.length > 0 && <span className="badge-count">{myTasks.length}</span>}</h2>
-              <Link to="/tasks" className="link-more">Все</Link>
-            </div>
+      {/* Мои задачи (user) */}
+      {!isAdmin && (
+        <div className="section">
+          <div className="section-header">
+            <span className="section-title"><ClipboardList size={14} />Мои задачи</span>
+            <Link to="/tasks" className="see-all">Все →</Link>
+          </div>
+          <div className="tasks-list">
             {myTasks.length === 0
-              ? <p className="empty-state">✨ Нет назначенных задач</p>
-              : myTasks.slice(0, 5).map(t => <TaskCard key={t.id} task={t} />)
+              ? <div className="empty-state">Нет назначенных задач</div>
+              : myTasks.slice(0, 5).map(t => <TaskMini key={t.id} task={t} />)
             }
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Дедлайн сегодня */}
-        <div className="dash-section">
-          <div className="dash-section-header">
-            <h2>Дедлайн сегодня {todayTasks.length > 0 && <span className="badge-count">{todayTasks.length}</span>}</h2>
-          </div>
+      {/* Дедлайн сегодня */}
+      <div className="section">
+        <div className="section-header">
+          <span className="section-title"><CalendarClock size={14} />Дедлайн сегодня</span>
+        </div>
+        <div className="tasks-list">
           {todayTasks.length === 0
-            ? <p className="empty-state">📅 Нет задач на сегодня</p>
-            : todayTasks.map(t => <TaskCard key={t.id} task={t} />)
+            ? <div className="empty-state">Нет задач с дедлайном сегодня</div>
+            : todayTasks.map(t => <TaskMini key={t.id} task={t} />)
           }
         </div>
+      </div>
 
-        {/* Активные задачи */}
-        <div className="dash-section">
-          <div className="dash-section-header">
-            <h2>Активные задачи</h2>
-            <Link to="/tasks" className="link-more">Все задачи</Link>
-          </div>
+      {/* Активные задачи */}
+      <div className="section">
+        <div className="section-header">
+          <span className="section-title"><Flame size={14} />Активные задачи</span>
+          <Link to="/tasks" className="see-all">Все задачи →</Link>
+        </div>
+        <div className="tasks-list">
           {activeTasks.length === 0
-            ? <p className="empty-state">✨ Нет активных задач</p>
-            : activeTasks.slice(0, 5).map(t => <TaskCard key={t.id} task={t} />)
+            ? <div className="empty-state">Нет активных задач</div>
+            : activeTasks.slice(0, 5).map(t => <TaskMini key={t.id} task={t} />)
           }
         </div>
       </div>
@@ -132,21 +141,23 @@ export default function DashboardPage() {
   );
 }
 
-function TaskCard({ task }) {
-  const meta = STATUS_META[task.status] || {};
+function TaskMini({ task }) {
+  const fmtDate = (d) => new Date(d).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
   return (
-    <Link to={`/tasks/${task.id}`} className="task-card-link">
-      <div className={`task-card-mini priority-${task.priority}`}>
-        <div className="task-card-mini-title">{task.title}</div>
-        <div className="task-card-mini-footer">
-          <span className={`status-badge ${meta.cls}`}>{meta.label}</span>
-          {task.deadline && (
-            <span className="task-card-deadline">
-              📅 {new Date(task.deadline).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
-            </span>
-          )}
-          {task.reward_points > 0 && <span className="reward-chip">💰 {task.reward_points}</span>}
-        </div>
+    <Link to={`/tasks/${task.id}`} className="task-mini">
+      <div className="task-mini-title">{task.title}</div>
+      <div className="task-meta">
+        <span className={`badge ${STATUS_CLS[task.status] || ''}`}>{STATUS_LABEL[task.status]}</span>
+        {task.deadline && (
+          <span className="task-deadline">
+            <Clock size={11} />{fmtDate(task.deadline)}
+          </span>
+        )}
+        {task.reward_points > 0 && (
+          <span className="task-reward">
+            <Coins size={11} />{task.reward_points}
+          </span>
+        )}
       </div>
     </Link>
   );

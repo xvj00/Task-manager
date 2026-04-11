@@ -1,24 +1,22 @@
 import { useEffect } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import {
+  House, Folder, LayoutDashboard, ClipboardList, Gift,
+  Settings2, LogOut, Coins, Trophy, Bell
+} from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import NotificationsBell from '../common/NotificationsBell';
 
 const NAV = [
-  { path: '/',            icon: '🏠', label: 'Главная'        },
-  { path: '/folders',     icon: '📁', label: 'Папки'          },
-  { path: '/projects',    icon: '🗂', label: 'Проекты'        },
-  { path: '/tasks',       icon: '📋', label: 'Задачи'         },
-  { path: '/prizes',      icon: '🎁', label: 'Витрина наград' },
-  { path: '/leaderboard', icon: '🏆', label: 'Лидерборд'      },
-];
-
-const ADMIN_NAV = [
-  { path: '/admin', icon: '⚙️', label: 'Администратор' },
+  { path: '/',         Icon: House,           label: 'Главная',        end: true },
+  { path: '/folders',  Icon: Folder,          label: 'Папки',          end: false },
+  { path: '/projects', Icon: LayoutDashboard, label: 'Проекты',        end: false },
+  { path: '/tasks',    Icon: ClipboardList,   label: 'Задачи',         end: false },
+  { path: '/prizes',   Icon: Gift,            label: 'Витрина наград', end: false },
 ];
 
 export default function Sidebar() {
   const { user, logout, fetchMe } = useAuthStore();
-  const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,46 +29,64 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-header">
-        <div className="sidebar-header-row">
-          <div className="logo">🏆 Artem List</div>
-          <NotificationsBell />
+      {/* Logo + bell */}
+      <div className="logo">
+        <div className="logo-text">
+          <div className="logo-icon">
+            <Trophy size={16} color="#fff" />
+          </div>
+          Artem List
         </div>
+        <NotificationsBell />
       </div>
 
-      <nav className="sidebar-nav">
-        {NAV.map(n => (
-          <Link key={n.path} to={n.path} className={`nav-item ${location.pathname === n.path ? 'active' : ''}`}>
-            <span className="nav-icon">{n.icon}</span> {n.label}
-          </Link>
+      {/* Nav */}
+      <div className="nav">
+        {NAV.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            end={item.end}
+            className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
+          >
+            <item.Icon size={14} style={{ flexShrink: 0 }} />
+            {item.label}
+          </NavLink>
         ))}
 
         {user?.role === 'admin' && (
           <>
-            <div className="nav-divider">Система</div>
-            {ADMIN_NAV.map(n => (
-              <Link key={n.path} to={n.path} className={`nav-item nav-creator ${location.pathname.startsWith(n.path) ? 'active' : ''}`}>
-                <span className="nav-icon">{n.icon}</span> {n.label}
-              </Link>
-            ))}
+            <div className="nav-sep">Система</div>
+            <NavLink
+              to="/admin"
+              className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}
+            >
+              <Settings2 size={14} style={{ flexShrink: 0 }} />
+              Администратор
+            </NavLink>
           </>
         )}
-      </nav>
+      </div>
 
-      <div className="sidebar-footer">
-        <div className="user-info">
-          <div className="user-avatar">{initials}</div>
-          <div>
+      {/* User block */}
+      <div className="user-block">
+        <div className="user-row">
+          <div className="avatar">{initials}</div>
+          <div className="user-info">
             <div className="user-name">{user?.name}</div>
-            <div className="user-role" style={{ fontSize: 11 }}>
-              @{user?.username} · {user?.role === 'admin' ? '🛡 Администратор' : '👤 Пользователь'}
-            </div>
+            <div className="user-role">@{user?.username} · {user?.role === 'admin' ? 'admin' : 'user'}</div>
           </div>
         </div>
-        <div className="sidebar-balance">
-          💰 <strong>{user?.balance ?? 0}</strong> баллов
+        <div className="balance-row">
+          <span className="balance-pill">
+            <Coins size={12} />
+            {user?.balance ?? 0} баллов
+          </span>
         </div>
-        <button className="btn-logout" onClick={handleLogout}>Выйти</button>
+        <button className="logout-btn" onClick={handleLogout}>
+          <LogOut size={13} />
+          Выйти
+        </button>
       </div>
     </aside>
   );

@@ -1,67 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bell, CheckCheck, CircleCheck, Zap, Shield, Gift, Coins, Users, XCircle, ClipboardList } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 
-const TYPE_LABELS = {
-  task_assigned:  { icon: '📋', label: 'Назначена задача' },
-  task_taken:     { icon: '🔄', label: 'Задачу взяли в работу' },
-  task_review:    { icon: '✅', label: 'Задача на проверке' },
-  task_approved:  { icon: '🏆', label: 'Задача подтверждена' },
-  task_rejected:  { icon: '❌', label: 'Задача отклонена' },
-  prize_requested: { icon: '🎁', label: 'Запрос на приз' },
-  prize_approved:  { icon: '🎉', label: 'Приз одобрен' },
-  prize_rejected:  { icon: '😞', label: 'Приз отклонён' },
-  points_credited: { icon: '💚', label: 'Баллы начислены' },
-  points_debited:  { icon: '🔴', label: 'Баллы списаны' },
-  invite_accepted: { icon: '✅', label: 'Приглашение принято' },
-  invite_declined: { icon: '❌', label: 'Приглашение отклонено' },
-  project_invite:  { icon: '📨', label: 'Приглашение в проект' },
-  folder_invite:   { icon: '📨', label: 'Приглашение в папку' },
-  project_joined:  { icon: '👤', label: 'Новый участник проекта' },
+const TYPE_META = {
+  task_approved:   { label: 'Задача подтверждена', Icon: CircleCheck, bg: '#ecfdf5', color: '#059669' },
+  task_review:     { label: 'Задача на проверке',  Icon: Shield,      bg: '#f5f3ff', color: '#7c3aed' },
+  task_taken:      { label: 'Задача взята в работу', Icon: Zap,        bg: '#fffbeb', color: '#d97706' },
+  task_assigned:   { label: 'Вам назначена задача', Icon: ClipboardList, bg: '#eef2ff', color: '#4f46e5' },
+  task_rejected:   { label: 'Задача отклонена',    Icon: XCircle,     bg: '#fff1f2', color: '#e11d48' },
+  prize_approved:  { label: 'Приз одобрен',        Icon: Gift,        bg: '#fffbeb', color: '#d97706' },
+  prize_requested: { label: 'Запрос на приз',      Icon: Gift,        bg: '#fffbeb', color: '#d97706' },
+  prize_rejected:  { label: 'Приз отклонён',       Icon: XCircle,     bg: '#fff1f2', color: '#e11d48' },
+  points_credited: { label: 'Баллы начислены',     Icon: Coins,       bg: '#ecfdf5', color: '#059669' },
+  points_debited:  { label: 'Баллы списаны',       Icon: Coins,       bg: '#fff1f2', color: '#e11d48' },
+  invite_accepted: { label: 'Приглашение принято', Icon: Users,       bg: '#eef2ff', color: '#4f46e5' },
+  invite_declined: { label: 'Приглашение отклонено', Icon: XCircle,   bg: '#fff1f2', color: '#e11d48' },
 };
 
 const ROLE_LABELS = { owner: 'Владелец', editor: 'Соавтор', member: 'Пользователь' };
-
-function getTitle(n) {
-  const meta = TYPE_LABELS[n.type];
-  return meta ? `${meta.icon} ${meta.label}` : n.type;
-}
-
-function getBody(n) {
-  const d = n.data || {};
-  if (d.task_title) {
-    let text = `«${d.task_title}»`;
-    if (n.type === 'task_assigned' && d.deadline) {
-      const dl = new Date(d.deadline);
-      text += ` — до ${dl.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
-    }
-    return text;
-  }
-  if (d.prize_name)   return `«${d.prize_name}»`;
-  if (d.project_name && d.inviter_name) return `от ${d.inviter_name} — «${d.project_name}» (роль: ${ROLE_LABELS[d.role] || d.role})`;
-  if (d.folder_name && d.inviter_name)  return `от ${d.inviter_name} — «${d.folder_name}» (роль: ${ROLE_LABELS[d.role] || d.role})`;
-  if (d.entity_name && d.user_name)     return `${d.user_name} — «${d.entity_name}»`;
-  if (d.project_name) return `«${d.project_name}»`;
-  if (d.folder_name)  return `«${d.folder_name}»`;
-  return '';
-}
-
-function getPoints(n) {
-  if (n.type === 'points_credited' || n.type === 'task_approved') return n.data?.points ?? n.data?.amount;
-  if (n.type === 'points_debited')  return -(n.data?.amount ?? 0);
-  return null;
-}
-
-function getLink(n) {
-  const d = n.data || {};
-  if (d.task_id)   return `/tasks/${d.task_id}`;
-  if (d.entity_type === 'project' && d.entity_id) return `/projects/${d.entity_id}`;
-  if (d.entity_type === 'folder'  && d.entity_id) return `/folders/${d.entity_id}`;
-  if (d.project_id) return `/projects/${d.project_id}`;
-  if (d.folder_id)  return `/folders/${d.folder_id}`;
-  return null;
-}
 
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -75,11 +33,39 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+function formatTitle(n) {
+  const meta = TYPE_META[n.type];
+  return meta?.label || n.type;
+}
+
+function formatDesc(n) {
+  const d = n.data || {};
+  const parts = [];
+  if (d.task_title)   parts.push(`«${d.task_title}»`);
+  if (d.prize_name)   parts.push(`«${d.prize_name}»`);
+  if (d.entity_name)  parts.push(`«${d.entity_name}»`);
+  if (d.points > 0)   parts.push(`начислено ${d.points} баллов`);
+  if (d.amount > 0 && n.type === 'points_credited') parts.push(`начислено ${d.amount} баллов`);
+  if (d.amount > 0 && n.type === 'points_debited')  parts.push(`списано ${d.amount} баллов`);
+  if (d.actor_name)   parts.push(`от ${d.actor_name}`);
+  return parts.join(' — ') || '';
+}
+
+function getLink(n) {
+  const d = n.data || {};
+  if (d.task_id)   return `/tasks/${d.task_id}`;
+  if (d.entity_type === 'project' && d.entity_id) return `/projects/${d.entity_id}`;
+  if (d.entity_type === 'folder'  && d.entity_id) return `/folders/${d.entity_id}`;
+  if (d.project_id) return `/projects/${d.project_id}`;
+  if (d.folder_id)  return `/folders/${d.folder_id}`;
+  return null;
+}
+
 export default function NotificationsPage() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [invitations, setInvitations]     = useState([]);
-  const [tab, setTab]     = useState('all'); // all | invitations
+  const [tab, setTab]     = useState('all');
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -91,6 +77,7 @@ export default function NotificationsPage() {
     setLoading(false);
   };
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, []);
 
   const markAllRead = async () => {
@@ -98,13 +85,9 @@ export default function NotificationsPage() {
     load();
   };
 
-  const markRead = async (id) => {
-    await api.post(`/notifications/${id}/read`).catch(() => {});
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
-  };
-
   const handleClick = async (n) => {
-    if (!n.read_at) await markRead(n.id);
+    if (!n.read_at) await api.post(`/notifications/${n.id}/read`).catch(() => {});
+    setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x));
     const link = getLink(n);
     if (link) navigate(link);
   };
@@ -129,86 +112,81 @@ export default function NotificationsPage() {
   const unread = notifications.filter(n => !n.read_at).length;
 
   return (
-    <div className="page page-narrow-lg">
+    <div>
       <div className="page-header">
-        <h1>🔔 Уведомления</h1>
+        <div className="page-title"><Bell size={18} />Уведомления</div>
         {unread > 0 && (
-          <button className="btn btn-secondary btn-sm" onClick={markAllRead}>
-            Прочитать все ({unread})
+          <button className="btn btn-ghost" onClick={markAllRead}>
+            <CheckCheck size={14} />Прочитать все ({unread})
           </button>
         )}
       </div>
 
-      {/* Табы */}
-      <div className="toolbar" style={{ marginBottom: 20 }}>
-        <div className="view-switcher">
-          <button className={`view-btn ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>
-            Все {unread > 0 && <span className="notif-tab-badge">{unread}</span>}
-          </button>
-          <button className={`view-btn ${tab === 'invitations' ? 'active' : ''}`} onClick={() => setTab('invitations')}>
-            Приглашения {invitations.length > 0 && <span className="notif-tab-badge invite">{invitations.length}</span>}
-          </button>
-        </div>
+      <div className="tabs">
+        <button className={`tab${tab === 'all' ? ' active' : ''}`} onClick={() => setTab('all')}>
+          Все {unread > 0 && `[${unread}]`}
+        </button>
+        <button className={`tab${tab === 'invitations' ? ' active' : ''}`} onClick={() => setTab('invitations')}>
+          Приглашения {invitations.length > 0 && `[${invitations.length}]`}
+        </button>
       </div>
 
-      {loading && <div className="loading">Загрузка...</div>}
+      {loading && <div style={{ color: 'var(--text3)', padding: 24 }}>Загрузка...</div>}
 
-      {/* Вкладка приглашений */}
       {!loading && tab === 'invitations' && (
-        <div className="notif-page-list">
-          {invitations.length === 0 && (
-            <div className="empty-state-big">📭 Активных приглашений нет</div>
-          )}
+        <div>
+          {invitations.length === 0 && <div className="empty-state">Активных приглашений нет</div>}
           {invitations.map(inv => (
-            <div key={inv.id} className="notif-page-invite">
-              <div className="notif-page-invite-icon">📨</div>
-              <div className="notif-page-invite-body">
-                <div className="notif-page-invite-title">
+            <div key={inv.id} className="notif-item">
+              <div className="notif-icon-box" style={{ background: 'var(--indigo-l)' }}>
+                <Users size={15} color="var(--indigo)" />
+              </div>
+              <div className="notif-body">
+                <div className="notif-title">
                   {inv.inviter?.name} приглашает вас в {inv.type === 'project' ? 'проект' : 'папку'}
                 </div>
-                <div className="notif-page-invite-name">«{inv.entity_name}»</div>
-                <div className="notif-page-invite-meta">
-                  Роль: <strong>{ROLE_LABELS[inv.role] || inv.role}</strong>
-                  <span className="notif-page-time">{timeAgo(inv.created_at)}</span>
-                </div>
+                <div className="notif-desc">«{inv.entity_name}» — роль: <strong>{ROLE_LABELS[inv.role] || inv.role}</strong></div>
               </div>
-              <div className="notif-page-invite-actions">
-                <button className="btn btn-primary btn-sm" onClick={() => handleAccept(inv)}>Принять</button>
-                <button className="btn btn-ghost btn-sm" onClick={() => handleDecline(inv)}>Отклонить</button>
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button className="btn btn-primary btn-xs" onClick={() => handleAccept(inv)}>Принять</button>
+                <button className="btn btn-ghost btn-xs" onClick={() => handleDecline(inv)}>Отклонить</button>
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Вкладка всех уведомлений */}
       {!loading && tab === 'all' && (
-        <div className="notif-page-list">
-          {notifications.length === 0 && (
-            <div className="empty-state-big">🔕 Уведомлений пока нет</div>
-          )}
+        <div>
+          {notifications.length === 0 && <div className="empty-state">Уведомлений пока нет</div>}
           {notifications.map(n => {
-            const pts = getPoints(n);
+            const meta = TYPE_META[n.type];
+            const Icon = meta?.Icon;
             const link = getLink(n);
             return (
               <div
                 key={n.id}
-                className={`notif-page-item ${!n.read_at ? 'unread' : ''} ${link ? 'clickable' : ''}`}
+                className="notif-item"
+                style={{
+                  cursor: link ? 'pointer' : 'default',
+                  opacity: n.read_at ? 0.7 : 1,
+                }}
                 onClick={() => handleClick(n)}
               >
-                <div className="notif-page-icon">{TYPE_LABELS[n.type]?.icon || '🔔'}</div>
-                <div className="notif-page-body">
-                  <div className="notif-page-title">{getTitle(n)}</div>
-                  {getBody(n) && <div className="notif-page-desc">{getBody(n)}</div>}
-                  {pts !== null && (
-                    <div className={`notif-page-pts ${pts >= 0 ? 'positive' : 'negative'}`}>
-                      {pts > 0 ? '+' : ''}{pts} баллов
-                    </div>
+                {Icon && (
+                  <div className="notif-icon-box" style={{ background: meta.bg }}>
+                    <Icon size={15} color={meta.color} />
+                  </div>
+                )}
+                <div className="notif-body">
+                  <div className="notif-title">{formatTitle(n)}</div>
+                  {formatDesc(n) && (
+                    <div className="notif-desc">{formatDesc(n)}</div>
                   )}
                 </div>
-                <div className="notif-page-right">
-                  <div className="notif-page-time">{timeAgo(n.created_at)}</div>
-                  {!n.read_at && <div className="notif-page-dot" />}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                  <div className="notif-time">{timeAgo(n.created_at)}</div>
+                  {!n.read_at && <div className="notif-dot" />}
                 </div>
               </div>
             );

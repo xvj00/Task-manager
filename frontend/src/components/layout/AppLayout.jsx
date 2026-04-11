@@ -25,11 +25,13 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="app-layout">
+    <div className="app">
       <Sidebar />
-      <main className="main-content">
-        <Outlet />
-      </main>
+      <div className="main">
+        <div className="screen">
+          <Outlet />
+        </div>
+      </div>
     </div>
   );
 }

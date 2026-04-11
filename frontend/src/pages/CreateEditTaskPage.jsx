@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { PlusCircle, Check, Paperclip, X, AlertCircle } from 'lucide-react';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
@@ -21,6 +22,15 @@ function formatSize(bytes) {
   return (bytes / 1024 / 1024).toFixed(1) + ' МБ';
 }
 
+function FieldError({ msg }) {
+  if (!msg) return null;
+  return (
+    <div className="field-error">
+      <AlertCircle size={11} />{msg}
+    </div>
+  );
+}
+
 export default function CreateEditTaskPage() {
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -31,8 +41,10 @@ export default function CreateEditTaskPage() {
   const fileInputRef = useRef();
 
   const [users, setUsers] = useState([]);
-  const [pendingFiles, setPendingFiles] = useState([]); // файлы ещё не загруженные
+  const [projects, setProjects] = useState([]);
+  const [pendingFiles, setPendingFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [form, setForm] = useState({
     title: '', description: '', deadline: '', priority: 'medium',
     assignee_id: '', reward_points: 0, category: '',
@@ -42,12 +54,10 @@ export default function CreateEditTaskPage() {
   useEffect(() => {
     if (user?.role === 'admin') {
       api.get('/admin/users').then(r => setUsers(r.data)).catch(() => {});
+      api.get('/projects').then(r => setProjects(r.data)).catch(() => {});
     } else if (projectIdFromUrl) {
-      api.get(`/projects/${projectIdFromUrl}`)
-        .then(r => setUsers(r.data.members || []))
-        .catch(() => {});
+      api.get(`/projects/${projectIdFromUrl}`).then(r => setUsers(r.data.members || [])).catch(() => {});
     }
-
     if (isEdit) {
       api.get(`/tasks/${id}`).then(r => {
         const t = r.data;
@@ -62,40 +72,88 @@ export default function CreateEditTaskPage() {
     }
   }, [id, projectIdFromUrl, user]);
 
-  const upd = f => e => setForm({ ...form, [f]: e.target.value });
+  const upd = f => e => {
+    setForm({ ...form, [f]: e.target.value });
+    if (errors[f]) setErrors({ ...errors, [f]: '' });
+  };
 
-  // Добавляем выбранные файлы в список (без дублей по имени+размеру)
+  const validate = () => {
+    const errs = {};
+    const title = form.title.trim();
+    if (!title) {
+      errs.title = 'Название обязательно';
+    } else if (title.length < 3) {
+      errs.title = 'Минимум 3 символа';
+    } else if (title.length > 150) {
+      errs.title = 'Максимум 150 символов';
+    }
+
+    const pts = Number(form.reward_points);
+    if (form.reward_points === '' || form.reward_points === null) {
+      errs.reward_points = 'Укажите количество баллов';
+    } else if (!Number.isInteger(pts) || pts < 0) {
+      errs.reward_points = 'Баллы: целое число ≥ 0';
+    } else if (pts > 100000) {
+      errs.reward_points = 'Максимум 100 000 баллов';
+    }
+
+    if (form.deadline) {
+      const dl = new Date(form.deadline);
+      if (isNaN(dl.getTime())) {
+        errs.deadline = 'Некорректная дата';
+      } else if (!isEdit && dl <= new Date()) {
+        errs.deadline = 'Дедлайн должен быть в будущем';
+      }
+    }
+
+    if (form.category && form.category.length > 50) {
+      errs.category = 'Максимум 50 символов';
+    }
+
+    return errs;
+  };
+
   const onFilesSelected = (e) => {
     const selected = Array.from(e.target.files);
+    const oversized = selected.filter(f => f.size > 10 * 1024 * 1024);
+    if (oversized.length > 0) {
+      toast.error(`Файл слишком большой: ${oversized[0].name} (макс. 10 МБ)`);
+    }
+    const ok = selected.filter(f => f.size <= 10 * 1024 * 1024);
     setPendingFiles(prev => {
       const existing = new Set(prev.map(f => f.name + f.size));
-      return [...prev, ...selected.filter(f => !existing.has(f.name + f.size))];
+      return [...prev, ...ok.filter(f => !existing.has(f.name + f.size))];
     });
     e.target.value = '';
   };
 
   const removeFile = (index) => setPendingFiles(prev => prev.filter((_, i) => i !== index));
 
-  // Загружаем все pendingFiles на задачу с данным taskId
   const uploadFiles = async (taskId) => {
     for (const file of pendingFiles) {
       const fd = new FormData();
       fd.append('file', file);
-      try {
-        await api.post(`/tasks/${taskId}/attachments`, fd);
-      } catch {
-        toast.error(`Не удалось загрузить: ${file.name}`);
-      }
+      try { await api.post(`/tasks/${taskId}/attachments`, fd); }
+      catch { toast.error(`Не удалось загрузить: ${file.name}`); }
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = { ...form };
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      // scroll to first error
+      const firstKey = Object.keys(errs)[0];
+      document.querySelector(`[data-field="${firstKey}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setErrors({});
+    const payload = { ...form, title: form.title.trim(), category: form.category.trim(), reward_points: Number(form.reward_points) };
     if (!payload.assignee_id) delete payload.assignee_id;
     if (!payload.deadline)    delete payload.deadline;
     if (!payload.project_id)  delete payload.project_id;
-
+    if (!payload.category)    delete payload.category;
     setUploading(true);
     try {
       if (isEdit) {
@@ -108,14 +166,17 @@ export default function CreateEditTaskPage() {
         const newId = r.data.id;
         if (pendingFiles.length > 0) await uploadFiles(newId);
         toast.success('Задача создана');
-        if (payload.project_id) {
-          navigate(`/projects/${payload.project_id}`);
-        } else {
-          navigate(`/tasks/${newId}`);
-        }
+        navigate(payload.project_id ? `/projects/${payload.project_id}` : `/tasks/${newId}`);
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Ошибка');
+      const serverErrors = err.response?.data?.errors;
+      if (serverErrors) {
+        const mapped = {};
+        Object.entries(serverErrors).forEach(([k, v]) => { mapped[k] = Array.isArray(v) ? v[0] : v; });
+        setErrors(mapped);
+      } else {
+        toast.error(err.response?.data?.message || 'Ошибка сохранения');
+      }
     } finally {
       setUploading(false);
     }
@@ -124,76 +185,136 @@ export default function CreateEditTaskPage() {
   const backUrl = projectIdFromUrl ? `/projects/${projectIdFromUrl}` : (isEdit ? `/tasks/${id}` : '/tasks');
 
   return (
-    <div className="page page-narrow">
+    <div>
       <div className="page-header">
-        <h1>{isEdit ? 'Редактировать задачу' : 'Новая задача'}</h1>
+        <div className="page-title">
+          <PlusCircle size={18} />{isEdit ? 'Редактирование задачи' : 'Создание задачи'}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => navigate(backUrl)} disabled={uploading}>Отмена</button>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={uploading}>
+            <Check size={14} />{uploading ? (pendingFiles.length > 0 ? 'Загрузка...' : 'Сохранение...') : (isEdit ? 'Сохранить' : 'Создать задачу')}
+          </button>
+        </div>
       </div>
-      <form onSubmit={handleSubmit} className="form-card">
-        <div className="form-group">
-          <label>Название *</label>
-          <input type="text" value={form.title} onChange={upd('title')} required maxLength={150} placeholder="Что нужно сделать?" />
-        </div>
-        <div className="form-group">
-          <label>Описание</label>
-          <textarea value={form.description} onChange={upd('description')} rows={4} placeholder="Подробное описание задачи..." />
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Приоритет</label>
-            <select value={form.priority} onChange={upd('priority')}>
-              <option value="low">Низкий</option>
-              <option value="medium">Средний</option>
-              <option value="high">Высокий</option>
-              <option value="urgent">🚨 Срочный</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Дедлайн</label>
-            <input
-              type="datetime-local"
-              value={form.deadline}
-              onChange={upd('deadline')}
-              min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
-            />
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Исполнитель</label>
-            <select value={form.assignee_id} onChange={upd('assignee_id')}>
-              <option value="">Открытая задача</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Категория / Тег</label>
-            <input type="text" value={form.category} onChange={upd('category')} placeholder="Например: Дом, Работа" />
-          </div>
-        </div>
-        <div className="form-group reward-input-group">
-          <label>💰 Награда (баллов)</label>
-          <input type="number" min="0" value={form.reward_points} onChange={upd('reward_points')} placeholder="0" />
-          <span className="reward-hint">Баллы начислятся только после подтверждения</span>
-        </div>
 
-        {/* Вложения */}
-        <div className="form-group">
-          <label>📎 Вложения</label>
-          <div className="task-form-attachments">
-            {pendingFiles.length > 0 && (
-              <div className="task-form-file-list">
-                {pendingFiles.map((f, i) => (
-                  <div key={i} className="task-form-file-row">
-                    <span className="task-form-file-icon">{getFileIcon(f.type)}</span>
-                    <span className="task-form-file-name">{f.name}</span>
-                    <span className="task-form-file-size">{formatSize(f.size)}</span>
-                    <button type="button" className="task-form-file-remove" onClick={() => removeFile(i)}>×</button>
-                  </div>
-                ))}
+      <div style={{ maxWidth: 600 }}>
+        <div className="detail-card">
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="form-group" data-field="title">
+              <label className="form-label">Название <span className="form-required">*</span></label>
+              <input
+                className={`form-input${errors.title ? ' input-error' : ''}`}
+                type="text"
+                value={form.title}
+                onChange={upd('title')}
+                maxLength={150}
+                placeholder="Введите название задачи"
+              />
+              <FieldError msg={errors.title} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Описание</label>
+              <textarea className="form-input" value={form.description} onChange={upd('description')} placeholder="Опишите задачу..." />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Приоритет <span className="form-required">*</span></label>
+                <select className="form-input" value={form.priority} onChange={upd('priority')}>
+                  <option value="low">Низкий</option>
+                  <option value="medium">Средний</option>
+                  <option value="high">Высокий</option>
+                  <option value="urgent">Срочный</option>
+                </select>
+              </div>
+
+              <div className="form-group" data-field="deadline">
+                <label className="form-label">Дедлайн</label>
+                <input
+                  className={`form-input${errors.deadline ? ' input-error' : ''}`}
+                  type="datetime-local"
+                  value={form.deadline}
+                  onChange={upd('deadline')}
+                  min={!isEdit ? new Date(Date.now() + 60000).toISOString().slice(0, 16) : undefined}
+                />
+                <FieldError msg={errors.deadline} />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Исполнитель</label>
+                <select className="form-input" value={form.assignee_id} onChange={upd('assignee_id')}>
+                  <option value="">Не назначен</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+
+              <div className="form-group" data-field="category">
+                <label className="form-label">Категория</label>
+                <input
+                  className={`form-input${errors.category ? ' input-error' : ''}`}
+                  type="text"
+                  value={form.category}
+                  onChange={upd('category')}
+                  placeholder="Например: Backend"
+                  maxLength={50}
+                />
+                <FieldError msg={errors.category} />
+              </div>
+
+              <div className="form-group" data-field="reward_points">
+                <label className="form-label">Баллы за выполнение</label>
+                <input
+                  className={`form-input${errors.reward_points ? ' input-error' : ''}`}
+                  type="number"
+                  min="0"
+                  max="100000"
+                  value={form.reward_points}
+                  onChange={upd('reward_points')}
+                  placeholder="100"
+                />
+                <FieldError msg={errors.reward_points} />
+              </div>
+            </div>
+
+            {user?.role === 'admin' && (
+              <div className="form-group">
+                <label className="form-label">Проект (необязательно)</label>
+                <select className="form-input" value={form.project_id} onChange={upd('project_id')}>
+                  <option value="">— Без проекта —</option>
+                  {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
               </div>
             )}
-            <label className="task-form-upload-btn">
-              + Добавить файл
+
+            {/* Вложения */}
+            <div className="form-group">
+              <label className="form-label">
+                <Paperclip size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />Вложения
+              </label>
+              {pendingFiles.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  {pendingFiles.map((f, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--surface2)', borderRadius: 'var(--r)', marginBottom: 4 }}>
+                      <span style={{ fontSize: 13 }}>{getFileIcon(f.type)}</span>
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: 500 }}>{f.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text3)' }}>{formatSize(f.size)}</span>
+                      <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', display: 'flex' }} onClick={() => removeFile(i)}>
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ fontSize: 12 }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip size={12} />Прикрепить файл
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -202,21 +323,11 @@ export default function CreateEditTaskPage() {
                 onChange={onFilesSelected}
                 accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar,.7z"
               />
-            </label>
-            <span className="reward-hint">Макс. 10 МБ на файл. jpg, png, pdf, doc, xls, zip и др.</span>
-          </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>Макс. 10 МБ на файл</div>
+            </div>
+          </form>
         </div>
-
-        <div className="form-actions">
-          <button type="button" className="btn btn-secondary" onClick={() => navigate(backUrl)} disabled={uploading}>Отмена</button>
-          <button type="submit" className="btn btn-primary" disabled={uploading}>
-            {uploading
-              ? (pendingFiles.length > 0 ? `Загрузка файлов...` : 'Сохранение...')
-              : (isEdit ? 'Сохранить' : 'Создать задачу')
-            }
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

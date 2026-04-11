@@ -13,7 +13,6 @@ import TaskDetailPage from './pages/TaskDetailPage';
 import CreateEditTaskPage from './pages/CreateEditTaskPage';
 import BalancePage from './pages/BalancePage';
 import PrizesPage from './pages/PrizesPage';
-import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
 import InvitePage from './pages/InvitePage';
 import NotificationsPage from './pages/NotificationsPage';
@@ -38,7 +37,6 @@ export default function App() {
           <Route path="/tasks/:id/edit" element={<CreateEditTaskPage />} />
           <Route path="/balance"        element={<BalancePage />} />
           <Route path="/prizes"         element={<PrizesPage />} />
-          <Route path="/leaderboard"    element={<LeaderboardPage />} />
           <Route path="/admin"          element={<AdminPage />} />
           <Route path="/notifications"  element={<NotificationsPage />} />
         </Route>

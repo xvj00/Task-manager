@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, UserPlus, Trash2, Folder, LayoutDashboard, User, Crown, Pencil, Plus } from 'lucide-react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
+
+const ROLE_LABELS = { owner: 'Владелец', editor: 'Редактор', member: 'Участник' };
 
 export default function FolderPage() {
   const { id } = useParams();
@@ -36,89 +39,106 @@ export default function FolderPage() {
     catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
   };
 
-  if (!folder) return <div className="loading">Загрузка...</div>;
+  if (!folder) return <div style={{ color: 'var(--text3)', padding: 24 }}>Загрузка...</div>;
   const isOwner = folder.owner_id === user?.id || user?.role === 'admin';
 
   return (
-    <div className="page page-narrow-lg">
-      <div className="page-header">
-        <button className="btn btn-ghost" onClick={() => navigate('/folders')}>← Назад</button>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => navigate('/folders')}>
+          <ArrowLeft size={12} />Назад
+        </button>
+        <div style={{ flex: 1 }} />
         {isOwner && (
-          <div className="page-actions">
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowInvite(!showInvite)}>+ Пригласить</button>
-            <button className="btn btn-danger btn-sm" onClick={handleDelete}>Удалить</button>
-          </div>
+          <>
+            <button className="btn btn-ghost" style={{ fontSize: 12 }} onClick={() => setShowInvite(!showInvite)}>
+              <UserPlus size={12} />Пригласить
+            </button>
+            <button className="btn btn-danger" style={{ fontSize: 12 }} onClick={handleDelete}>
+              <Trash2 size={12} />Удалить
+            </button>
+          </>
         )}
       </div>
 
-      <div className="folder-detail-header">
-        <div className="folder-icon-lg">📁</div>
+      <div className="page-header">
         <div>
-          <h1>{folder.name}</h1>
-          {folder.description && <p className="page-subtitle">{folder.description}</p>}
-          <p className="page-subtitle">Владелец: {folder.owner?.name}</p>
+          <div className="page-title"><Folder size={18} />{folder.name}</div>
+          {folder.description && <div className="page-sub">{folder.description}</div>}
         </div>
       </div>
 
       {showInvite && (
-        <form onSubmit={handleInvite} className="form-card" style={{ marginBottom: 20 }}>
-          <h3>Пригласить в папку</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Юзернейм пользователя</label>
-              <input type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} required placeholder="@username" />
+        <div className="detail-card" style={{ maxWidth: 480, marginBottom: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>Пригласить в папку</div>
+          <form onSubmit={handleInvite}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Юзернейм пользователя</label>
+                <input className="form-input" type="text" value={inviteUsername} onChange={e => setInviteUsername(e.target.value)} required placeholder="@username" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Роль</label>
+                <select className="form-input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                  <option value="editor">Редактор</option>
+                  <option value="member">Участник</option>
+                </select>
+              </div>
             </div>
-            <div className="form-group">
-              <label>Роль</label>
-              <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
-                <option value="editor">Редактор</option>
-                <option value="member">Участник</option>
-              </select>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowInvite(false)}>Отмена</button>
+              <button type="submit" className="btn btn-primary">Пригласить</button>
             </div>
-          </div>
-          <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setShowInvite(false)}>Отмена</button>
-            <button type="submit" className="btn btn-primary">Пригласить</button>
-          </div>
-        </form>
+          </form>
+        </div>
       )}
 
-      <div className="folder-sections">
-        {/* Проекты */}
-        <div className="folder-section">
-          <div className="dash-section-header">
-            <h2>Проекты ({folder.projects?.length ?? 0})</h2>
-            <Link to={`/projects/new?folder_id=${id}`} className="btn btn-primary btn-sm">+ Новый проект</Link>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16 }}>
+        {/* Projects */}
+        <div>
+          <div className="section-header" style={{ marginBottom: 12 }}>
+            <span className="section-title"><LayoutDashboard size={14} />Проекты ({folder.projects?.length ?? 0})</span>
+            <Link to={`/projects?folder_id=${id}`} className="btn btn-primary" style={{ fontSize: 11 }}>
+              <Plus size={12} />Новый проект
+            </Link>
           </div>
-          {folder.projects?.length === 0
-            ? <p className="empty-state">Проектов пока нет</p>
-            : folder.projects?.map(p => (
-              <Link key={p.id} to={`/projects/${p.id}`} className="project-row">
-                <div className="project-row-icon">🗂</div>
-                <div className="project-row-info">
-                  <div className="project-row-name">{p.name}</div>
-                  {p.description && <div className="project-row-desc">{p.description}</div>}
+          {folder.projects?.length === 0 ? (
+            <div className="empty-state">Проектов пока нет</div>
+          ) : (
+            folder.projects?.map(p => (
+              <Link key={p.id} to={`/projects/${p.id}`} className="task-mini" style={{ display: 'flex' }}>
+                <div className="task-mini-title">{p.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <User size={11} />{p.owner?.name}
                 </div>
-                <div className="project-row-owner">👤 {p.owner?.name}</div>
               </Link>
             ))
-          }
+          )}
         </div>
 
-        {/* Участники */}
-        <div className="folder-section">
-          <h2>Участники ({folder.members?.length ?? 0})</h2>
-          <div className="members-list">
+        {/* Members */}
+        <div>
+          <div className="section-header" style={{ marginBottom: 12 }}>
+            <span className="section-title"><User size={14} />Участники ({folder.members?.length ?? 0})</span>
+          </div>
+          <div className="detail-card" style={{ padding: '8px 0' }}>
             {folder.members?.map(m => (
-              <div key={m.id} className="member-row">
-                <div className="member-avatar">{m.name[0].toUpperCase()}</div>
-                <div className="member-info">
-                  <div className="member-name">{m.name}</div>
-                  <div className="member-email">{m.email}</div>
+              <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderBottom: '0.5px solid var(--border)' }}>
+                <div className="avatar" style={{ width: 28, height: 28, fontSize: 10, flexShrink: 0 }}>
+                  {m.name[0].toUpperCase()}
                 </div>
-                <span className={`role-badge ${m.pivot?.role}`}>{ROLE_LABELS[m.pivot?.role]}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>{m.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>@{m.username}</div>
+                </div>
+                <span className="chip" style={{ fontSize: 10 }}>
+                  {m.pivot?.role === 'owner' ? <Crown size={10} /> : m.pivot?.role === 'editor' ? <Pencil size={10} /> : <User size={10} />}
+                  {ROLE_LABELS[m.pivot?.role]}
+                </span>
                 {isOwner && m.id !== folder.owner_id && (
-                  <button className="btn btn-danger btn-xs" onClick={() => handleRemoveMember(m.id)}>Удалить</button>
+                  <button className="btn btn-danger btn-xs" onClick={() => handleRemoveMember(m.id)}>
+                    <Trash2 size={11} />
+                  </button>
                 )}
               </div>
             ))}
@@ -128,5 +148,3 @@ export default function FolderPage() {
     </div>
   );
 }
-
-const ROLE_LABELS = { owner: '👑 Владелец', editor: '✏️ Редактор', member: '👤 Участник' };
