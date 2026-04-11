@@ -33,7 +33,7 @@ export default function BlockedPage({ reason, appealSubmitted: initialSubmitted 
           <div className="auth-logo-icon">
             <Trophy size={22} color="#fff" />
           </div>
-          <div className="auth-app-name">Artem List</div>
+          <div className="auth-app-name">Таск-менеджер</div>
         </div>
 
         <div className="auth-card">

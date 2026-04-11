@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Settings2, Users, ClipboardList, Clock, CircleCheck, Coins, Search, Zap, FileText, CheckCircle, Ban, Unlock, PlusCircle, AlertCircle } from 'lucide-react';
 
 function FieldError({ msg }) {
@@ -155,7 +156,8 @@ export default function AdminPage() {
     catch (err) { toast.error(err.response?.data?.message || 'Ошибка'); }
   };
 
-  if (user?.role !== 'admin') return <div className="empty-state" style={{ padding: 48 }}>Доступ запрещён</div>;
+  if (user && user.role !== 'admin') return <Navigate to="/" replace />;
+  if (!user) return null;
 
   return (
     <div>

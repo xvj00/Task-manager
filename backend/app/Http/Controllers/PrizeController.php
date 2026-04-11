@@ -9,6 +9,7 @@ use App\Models\Notification;
 use App\Models\Prize;
 use App\Models\PrizeRequest;
 use App\Models\Transaction;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class PrizeController extends Controller
@@ -20,8 +21,6 @@ class PrizeController extends Controller
 
     public function store(StorePrizeRequest $request)
     {
-        if (!$request->user()->isCreator()) abort(403);
-
         $data  = $request->validated();
         $prize = Prize::create([...$data, 'created_by' => $request->user()->id]);
         return response()->json($prize, 201);
@@ -29,15 +28,12 @@ class PrizeController extends Controller
 
     public function update(UpdatePrizeRequest $request, Prize $prize)
     {
-        if (!$request->user()->isCreator()) abort(403);
-
         $prize->update($request->validated());
         return response()->json($prize);
     }
 
     public function destroy(Request $request, Prize $prize)
     {
-        if (!$request->user()->isCreator()) abort(403);
         $prize->delete();
         return response()->json(null, 204);
     }
@@ -62,9 +58,9 @@ class PrizeController extends Controller
         ]);
 
         // Уведомить создателя
-        foreach (\App\Models\User::where('role', 'creator')->get() as $creator) {
+        foreach (User::where('role', 'admin')->get() as $admin) {
             Notification::create([
-                'user_id' => $creator->id,
+                'user_id' => $admin->id,
                 'type'    => 'prize_requested',
                 'data'    => ['prize_name' => $prize->name, 'user_name' => $user->name, 'request_id' => $prizeRequest->id],
             ]);
@@ -76,8 +72,6 @@ class PrizeController extends Controller
     // Все запросы (создатель)
     public function requests(Request $request)
     {
-        if (!$request->user()->isCreator()) abort(403);
-
         $requests = PrizeRequest::with(['prize', 'user'])
             ->orderByDesc('created_at')->get();
 
@@ -95,8 +89,6 @@ class PrizeController extends Controller
     // Подтвердить/отклонить запрос (создатель)
     public function handleRequest(HandlePrizeRequestRequest $request, PrizeRequest $prizeRequest)
     {
-        if (!$request->user()->isCreator()) abort(403);
-
         $data = $request->validated();
 
         if ($data['action'] === 'approve') {

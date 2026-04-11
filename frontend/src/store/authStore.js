@@ -8,10 +8,14 @@ const useAuthStore = create((set) => ({
 
   login: async (email, password) => {
     set({ loading: true });
-    const { data } = await api.post('/login', { email, password });
-    localStorage.setItem('al_token', data.token);
-    set({ user: data.user, token: data.token, loading: false });
-    return data;
+    try {
+      const { data } = await api.post('/login', { email, password });
+      localStorage.setItem('al_token', data.token);
+      set({ user: data.user, token: data.token });
+      return data;
+    } finally {
+      set({ loading: false });
+    }
   },
 
   register: async (formData) => {

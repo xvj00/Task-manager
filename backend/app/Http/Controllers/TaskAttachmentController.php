@@ -39,16 +39,45 @@ class TaskAttachmentController extends Controller
 
     public function serve(Request $request, string $filename)
     {
-        $path = storage_path("app/public/attachments/{$filename}");
-        if (!file_exists($path)) abort(404);
-        return response()->file($path, [
+        if ($request->isMethod('OPTIONS')) {
+            return response('', 204)->withHeaders($this->fileCorsHeaders());
+        }
+
+        if (str_contains($filename, '..') || str_contains($filename, '/') || str_contains($filename, '\\')) {
+            abort(404);
+        }
+
+        $path = storage_path('app/public/attachments/'.$filename);
+        if (! is_file($path)) {
+            abort(404);
+        }
+
+        return tap(response()->file($path, array_merge([
+            'Content-Disposition' => 'inline; filename="'.basename($path).'"',
+            'Cross-Origin-Resource-Policy' => 'cross-origin',
+        ], $this->fileCorsHeaders())), function ($response) {
+            $response->headers->remove('X-Frame-Options');
+            $ancestors = config('app.frontend_frame_ancestors', '*');
+            $response->headers->set('Content-Security-Policy', 'frame-ancestors '.$ancestors);
+        });
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function fileCorsHeaders(): array
+    {
+        return [
             'Access-Control-Allow-Origin' => '*',
-        ]);
+            'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Authorization, Content-Type, Accept',
+            'Access-Control-Max-Age' => '86400',
+        ];
     }
 
     public function destroy(Request $request, Task $task, TaskAttachment $attachment)
     {
-        if ($attachment->user_id !== $request->user()->id && !$request->user()->isCreator()) {
+        if ($attachment->user_id !== $request->user()->id && !$request->user()->isAdmin()) {
             abort(403, 'Нельзя удалить чужое вложение.');
         }
 

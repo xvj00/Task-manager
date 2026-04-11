@@ -47,7 +47,7 @@ class TaskCommentController extends Controller
 
     public function destroy(Request $request, Task $task, TaskComment $comment)
     {
-        if ($comment->user_id !== $request->user()->id && !$request->user()->isCreator()) {
+        if ($comment->user_id !== $request->user()->id && !$request->user()->isAdmin()) {
             abort(403, 'Нельзя удалить чужой комментарий.');
         }
         $comment->delete();

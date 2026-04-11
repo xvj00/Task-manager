@@ -10,34 +10,32 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // Создатель (администратор)
         User::create([
-            'name'     => 'Создатель',
-            'email'    => 'creator@artem.ru',
-            'password' => bcrypt('creator123'),
-            'role'     => 'creator',
+            'name'     => 'Администратор',
+            'username' => 'admin',
+            'email'    => 'admin@example.com',
+            'password' => bcrypt('admin123'),
+            'role'     => 'admin',
             'balance'  => 0,
         ]);
 
-        // Исполнители
         User::create([
             'name'     => 'Иван Исполнитель',
-            'email'    => 'ivan@artem.ru',
+            'username' => 'ivan',
+            'email'    => 'ivan@example.com',
             'password' => bcrypt('ivan123'),
-            'role'     => 'executor',
+            'role'     => 'user',
             'balance'  => 150,
         ]);
 
         User::create([
             'name'     => 'Мария Работник',
-            'email'    => 'maria@artem.ru',
+            'username' => 'maria',
+            'email'    => 'maria@example.com',
             'password' => bcrypt('maria123'),
-            'role'     => 'executor',
+            'role'     => 'user',
             'balance'  => 80,
         ]);
     }

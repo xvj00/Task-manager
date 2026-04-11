@@ -14,7 +14,7 @@ class TransactionController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $targetId = $user->isCreator() && $request->filled('user_id')
+        $targetId = $user->isAdmin() && $request->filled('user_id')
             ? $request->user_id
             : $user->id;
 
@@ -31,8 +31,6 @@ class TransactionController extends Controller
     // Ручное начисление/списание (создатель)
     public function manual(ManualTransactionRequest $request)
     {
-        if (!$request->user()->isCreator()) abort(403);
-
         $data = $request->validated();
 
         $target = User::findOrFail($data['user_id']);
@@ -65,9 +63,7 @@ class TransactionController extends Controller
     // Балансы всех пользователей (создатель)
     public function allBalances(Request $request)
     {
-        if (!$request->user()->isCreator()) abort(403);
-
-        $users = User::where('role', 'executor')
+        $users = User::where('role', 'user')
             ->withCount(['tasks as completed_tasks' => fn($q) => $q->where('status', 'done')])
             ->orderByDesc('balance')
             ->get(['id', 'name', 'email', 'balance']);

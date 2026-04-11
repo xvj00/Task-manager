@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -33,8 +34,10 @@ return new class extends Migration
             $table->string('username')->nullable(false)->change();
         });
 
-        // Сначала расширяем ENUM чтобы принимал и старые и новые значения
-        \DB::statement("ALTER TABLE users MODIFY role ENUM('creator','executor','admin','user') NOT NULL DEFAULT 'user'");
+        // MySQL/MariaDB: расширяем ENUM, чтобы принимал и старые и новые значения (SQLite хранит role как строку)
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE users MODIFY role ENUM('creator','executor','admin','user') NOT NULL DEFAULT 'user'");
+        }
 
         // Меняем значения роли: creator → admin, executor → user
         \DB::table('users')->where('role', 'creator')->update(['role' => 'admin']);

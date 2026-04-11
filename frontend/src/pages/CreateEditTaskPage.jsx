@@ -52,29 +52,42 @@ export default function CreateEditTaskPage() {
   });
 
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (!user) return;
+    if (user.role === 'admin') {
       api.get('/admin/users').then(r => setUsers(r.data)).catch(() => {});
       api.get('/projects').then(r => setProjects(r.data)).catch(() => {});
-    } else if (projectIdFromUrl) {
-      api.get(`/projects/${projectIdFromUrl}`).then(r => setUsers(r.data.members || [])).catch(() => {});
+    } else {
+      api.get('/projects').then(r => setProjects(r.data)).catch(() => {});
     }
-    if (isEdit) {
-      api.get(`/tasks/${id}`).then(r => {
-        const t = r.data;
-        setForm({
-          title: t.title, description: t.description || '',
-          deadline: t.deadline ? new Date(t.deadline).toISOString().slice(0, 16) : '',
-          priority: t.priority, assignee_id: t.assignee_id || '',
-          reward_points: t.reward_points, category: t.category || '',
-          project_id: t.project_id || projectIdFromUrl || '',
-        });
-      }).catch(() => navigate(-1));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role === 'admin') return;
+    const pid = projectIdFromUrl || form.project_id;
+    if (!pid) {
+      setUsers([]);
+      return;
     }
-  }, [id, projectIdFromUrl, user]);
+    api.get(`/projects/${pid}`).then(r => setUsers(r.data.members || [])).catch(() => setUsers([]));
+  }, [user, projectIdFromUrl, form.project_id]);
+
+  useEffect(() => {
+    if (!isEdit || !id) return;
+    api.get(`/tasks/${id}`).then(r => {
+      const t = r.data;
+      setForm({
+        title: t.title, description: t.description || '',
+        deadline: t.deadline ? new Date(t.deadline).toISOString().slice(0, 16) : '',
+        priority: t.priority, assignee_id: t.assignee_id || '',
+        reward_points: t.reward_points, category: t.category || '',
+        project_id: t.project_id != null ? String(t.project_id) : (projectIdFromUrl || ''),
+      });
+    }).catch(() => navigate(-1));
+  }, [id, isEdit, navigate, projectIdFromUrl]);
 
   const upd = f => e => {
-    setForm({ ...form, [f]: e.target.value });
-    if (errors[f]) setErrors({ ...errors, [f]: '' });
+    setForm(prev => ({ ...prev, [f]: e.target.value }));
+    if (errors[f]) setErrors(prev => ({ ...prev, [f]: '' }));
   };
 
   const validate = () => {
@@ -108,6 +121,11 @@ export default function CreateEditTaskPage() {
 
     if (form.category && form.category.length > 50) {
       errs.category = 'Максимум 50 символов';
+    }
+
+    if (user?.role !== 'admin' && !isEdit) {
+      const pid = String(form.project_id || projectIdFromUrl || '').trim();
+      if (!pid) errs.project_id = 'Выберите проект';
     }
 
     return errs;
@@ -149,10 +167,18 @@ export default function CreateEditTaskPage() {
       return;
     }
     setErrors({});
-    const payload = { ...form, title: form.title.trim(), category: form.category.trim(), reward_points: Number(form.reward_points) };
+    const payload = {
+      ...form,
+      title: form.title.trim(),
+      category: form.category.trim(),
+      reward_points: Number(form.reward_points),
+      project_id: form.project_id || projectIdFromUrl || '',
+    };
     if (!payload.assignee_id) delete payload.assignee_id;
     if (!payload.deadline)    delete payload.deadline;
-    if (!payload.project_id)  delete payload.project_id;
+    if (isEdit) delete payload.project_id;
+    else if (!payload.project_id) delete payload.project_id;
+    else payload.project_id = Number(payload.project_id);
     if (!payload.category)    delete payload.category;
     setUploading(true);
     try {
@@ -166,7 +192,8 @@ export default function CreateEditTaskPage() {
         const newId = r.data.id;
         if (pendingFiles.length > 0) await uploadFiles(newId);
         toast.success('Задача создана');
-        navigate(payload.project_id ? `/projects/${payload.project_id}` : `/tasks/${newId}`);
+        const navPid = payload.project_id;
+        navigate(navPid ? `/projects/${navPid}` : `/tasks/${newId}`);
       }
     } catch (err) {
       const serverErrors = err.response?.data?.errors;
@@ -218,6 +245,22 @@ export default function CreateEditTaskPage() {
               <label className="form-label">Описание</label>
               <textarea className="form-input" value={form.description} onChange={upd('description')} placeholder="Опишите задачу..." />
             </div>
+
+            {user?.role !== 'admin' && !isEdit && (
+              <div className="form-group" data-field="project_id">
+                <label className="form-label">Проект <span className="form-required">*</span></label>
+                <select
+                  className={`form-input${errors.project_id ? ' input-error' : ''}`}
+                  value={form.project_id || projectIdFromUrl || ''}
+                  onChange={upd('project_id')}
+                  disabled={Boolean(projectIdFromUrl)}
+                >
+                  <option value="">— Выберите проект —</option>
+                  {projects.map(p => <option key={p.id} value={String(p.id)}>{p.name}</option>)}
+                </select>
+                <FieldError msg={errors.project_id} />
+              </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div className="form-group">

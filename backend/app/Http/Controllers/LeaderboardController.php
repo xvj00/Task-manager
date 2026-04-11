@@ -9,7 +9,7 @@ class LeaderboardController extends Controller
 {
     public function index()
     {
-        $users = User::where('role', 'executor')
+        $users = User::where('role', 'user')
             ->withCount(['tasks as completed_tasks' => fn($q) => $q->where('status', 'done')])
             ->orderByDesc('balance')
             ->get(['id', 'name', 'balance']);

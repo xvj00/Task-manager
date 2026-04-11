@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { renderAsync } from 'docx-preview';
 import {
   ArrowLeft, Pencil, Archive, Trash2, ShieldCheck, Check, X,
   ListChecks, Plus, MessageCircle, Send, History, Paperclip,
@@ -8,6 +7,7 @@ import {
   Download, ZoomIn, ZoomOut, Maximize2, Minimize2,
 } from 'lucide-react';
 import api from '../api/axios';
+import { getApiOrigin } from '../config.js';
 import useAuthStore from '../store/authStore';
 import toast from 'react-hot-toast';
 
@@ -19,6 +19,13 @@ const PRIORITY_LABEL = { low:'Низкий', medium:'Средний', high:'Вы
 const isImage = (m) => !!m?.startsWith('image/');
 const isPdf   = (m) => m === 'application/pdf';
 const isDocx  = (m) => m === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || m === 'application/msword';
+
+/** Запас под сайдбар + колонку задачи; на узком экране панель на весь экран */
+function layoutReservePx(width) {
+  if (width <= 640) return 16;
+  if (width <= 900) return 72;
+  return 616;
+}
 
 function getFileIcon(mime, size = 14) {
   if (!mime) return <FileText size={size} color="var(--text3)" />;
@@ -36,32 +43,49 @@ function formatSize(bytes) {
 }
 
 /* ── One file preview pane (logic from reference project) ── */
-function FilePreviewPane({ file, fileUrl, fileApiUrl, isResizing, paneStyle, onClose, onDownload, onAutoResize, initialZoom = 1 }) {
+function FilePreviewPane({ file, fileServeUrl, isResizing, paneStyle, onClose, onDownload, onAutoResize, initialZoom = 1 }) {
   const [zoom, setZoom]                   = useState(initialZoom);
   const [imgFullscreen, setImgFullscreen] = useState(false);
   const docxRef = useRef(null);
+  const fileServeUrlRef = useRef(fileServeUrl);
+  const onAutoResizeRef = useRef(onAutoResize);
+  fileServeUrlRef.current = fileServeUrl;
+  onAutoResizeRef.current = onAutoResize;
 
   // initialZoom arrives after img.onload (async) — sync zoom when it updates
   useEffect(() => { setZoom(initialZoom); }, [initialZoom]);
 
-  // Render DOCX and auto-resize panel width to fit content
+  // DOCX: тяжёлый docx-preview подгружается только при открытии такого файла (отдельный чанк)
   useEffect(() => {
     if (!isDocx(file.mime_type) || !docxRef.current) return;
-    docxRef.current.innerHTML = '<div style="padding:24px;color:#888">Загрузка документа...</div>';
-    fetch(fileApiUrl(file))
-      .then(r => r.blob())
-      .then(async blob => {
+    const el = docxRef.current;
+    el.innerHTML = '<div style="padding:24px;color:#888">Загрузка документа...</div>';
+    let cancelled = false;
+    (async () => {
+      try {
+        const { renderAsync } = await import('docx-preview');
+        if (cancelled || !docxRef.current) return;
+        const r = await fetch(fileServeUrlRef.current(file));
+        if (cancelled || !docxRef.current) return;
+        const blob = await r.blob();
+        if (cancelled || !docxRef.current) return;
         await renderAsync(blob, docxRef.current, null, {
           className: 'docx-render', inWrapper: true, breakPages: true, useBase64URL: true,
         });
         requestAnimationFrame(() => {
+          if (cancelled || !docxRef.current) return;
           const page = docxRef.current?.querySelector('.docx-wrapper > section, .docx');
           const w = page ? page.scrollWidth : docxRef.current?.scrollWidth;
-          if (w) onAutoResize?.(w + 48);
+          if (w) onAutoResizeRef.current?.(w + 48);
         });
-      })
-      .catch(() => {});
-  }, [file.id]); // eslint-disable-line react-hooks/exhaustive-deps
+      } catch {
+        if (!cancelled && docxRef.current) {
+          docxRef.current.innerHTML = '<div style="padding:24px;color:#e11d48">Не удалось открыть документ</div>';
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [file.id, file.mime_type]);
 
   // ESC closes image fullscreen
   useEffect(() => {
@@ -141,8 +165,10 @@ function FilePreviewPane({ file, fileUrl, fileApiUrl, isResizing, paneStyle, onC
           {isImage(file.mime_type) ? (
             <div style={{ padding:12, background:'#f8fafc', minHeight:'100%', display:'flex', justifyContent:'center', alignItems:'flex-start', overflow:'auto' }}>
               <img
-                src={fileUrl(file)}
+                src={fileServeUrl(file)}
                 alt={file.original_name}
+                loading="lazy"
+                decoding="async"
                 style={{
                   display:'block',
                   flexShrink:0,
@@ -159,8 +185,9 @@ function FilePreviewPane({ file, fileUrl, fileApiUrl, isResizing, paneStyle, onC
               {/* Overlay during resize prevents iframe from stealing mouse events */}
               {isResizing && <div style={{ position:'absolute', inset:0, zIndex:10 }} />}
               <iframe
-                src={`${fileUrl(file)}#zoom=${Math.round(zoom * 100)}&toolbar=1&navpanes=0`}
+                src={`${fileServeUrl(file)}#zoom=${Math.round(zoom * 100)}&toolbar=1&navpanes=0`}
                 title={file.original_name}
+                loading="lazy"
                 style={{ width:'100%', height:'100%', border:'none', display:'block' }}
               />
             </div>
@@ -192,8 +219,10 @@ function FilePreviewPane({ file, fileUrl, fileApiUrl, isResizing, paneStyle, onC
             <X size={20} />
           </button>
           <img
-            src={fileUrl(file)}
+            src={fileServeUrl(file)}
             alt={file.original_name}
+            loading="lazy"
+            decoding="async"
             style={{ maxWidth:'95vw', maxHeight:'95vh', objectFit:'contain', borderRadius:'var(--r)' }}
             onClick={e => e.stopPropagation()}
           />
@@ -226,6 +255,7 @@ export default function TaskDetailPage() {
   const [isResizing, setIsResizing]           = useState(false);
   const [isSplitResizing, setIsSplitResizing] = useState(false);
   const [paneInitialZoom, setPaneInitialZoom] = useState({});
+  const [viewportW, setViewportW] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
 
   const isResizingRef      = useRef(false);
   const isSplitResizingRef = useRef(false);
@@ -243,10 +273,18 @@ export default function TaskDetailPage() {
   };
   useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fileUrl    = (a) => `http://127.0.0.1:8001/storage/attachments/${a.filename}`;
-  const fileApiUrl = (a) => `http://127.0.0.1:8001/api/files/${a.filename}`;
+  useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
-  const maxPanelW = () => window.innerWidth - 616; // sidebar(220) + gap(16) + minTask(380)
+  /** Всегда через API: не зависит от storage:link, корректные CORS/CORP/iframe с фронта :5173 */
+  const fileServeUrl = (a) => `${getApiOrigin()}/api/files/${a.filename}`;
+
+  const reserve = layoutReservePx(viewportW);
+  const maxPanelW = () => viewportW - reserve;
+  const isWideLayout = viewportW > 900;
 
   // Auto-resize panel + zoom, then open the file (deferred for images so sizes are ready on mount)
   const autoResizeAndOpen = (file) => {
@@ -259,11 +297,14 @@ export default function TaskDetailPage() {
         const displayW = img.naturalWidth * zoom;
         const target   = Math.min(displayW + 40, max);
         // Set everything before mounting the pane — no async mismatch
-        setPanelWidth(Math.max(360, target));
+        {
+          const cap = viewportW - reserve;
+          setPanelWidth(Math.min(Math.max(240, target), Math.max(240, cap)));
+        }
         setPaneInitialZoom(prev => ({ ...prev, [file.id]: zoom }));
         setPreviewFiles([file]);
       };
-      img.src = fileUrl(file);
+      img.src = fileServeUrl(file);
     } else {
       // PDF / DOCX — open immediately, no dimension pre-check needed
       if (isPdf(file.mime_type)) setPanelWidth(Math.min(860, max));
@@ -299,7 +340,7 @@ export default function TaskDetailPage() {
       if (!isResizingRef.current) return;
       const w = window.innerWidth - ev.clientX;
       // sidebar(220) + gap(16) + min task visible(380) = 616
-      setPanelWidth(Math.min(Math.max(w, 280), window.innerWidth - 616));
+      setPanelWidth(Math.min(Math.max(w, 200), window.innerWidth - layoutReservePx(window.innerWidth)));
     };
     const onUp = () => {
       isResizingRef.current = false;
@@ -442,10 +483,14 @@ export default function TaskDetailPage() {
   return (
     <div>
       {/* Left content — gets right margin when panel is open */}
-      <div style={{ maxWidth:680, marginRight: hasPreview && !panelFullscreen ? panelWidth + 16 : 0 }}>
+      <div style={{
+        maxWidth: isWideLayout ? 680 : '100%',
+        marginRight: hasPreview && !panelFullscreen && isWideLayout ? panelWidth + 16 : 0,
+      }}
+      >
 
         {/* Back + actions bar */}
-        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, flexWrap: isWideLayout ? 'nowrap' : 'wrap' }}>
           <button className="btn btn-ghost" style={{ fontSize:12 }} onClick={() => navigate(task.project_id ? `/projects/${task.project_id}` : '/tasks')}>
             <ArrowLeft size={12} />Назад
           </button>
@@ -739,8 +784,7 @@ export default function TaskDetailPage() {
           <FilePreviewPane
             key={previewFiles[0].id}
             file={previewFiles[0]}
-            fileUrl={fileUrl}
-            fileApiUrl={fileApiUrl}
+            fileServeUrl={fileServeUrl}
             initialZoom={paneInitialZoom[previewFiles[0].id] ?? 1}
             isResizing={isResizing || isSplitResizing}
             paneStyle={previewFiles.length === 2
@@ -774,8 +818,7 @@ export default function TaskDetailPage() {
               <FilePreviewPane
                 key={previewFiles[1].id}
                 file={previewFiles[1]}
-                fileUrl={fileUrl}
-                fileApiUrl={fileApiUrl}
+                fileServeUrl={fileServeUrl}
                 initialZoom={paneInitialZoom[previewFiles[1].id] ?? 1}
                 isResizing={isResizing || isSplitResizing}
                 paneStyle={{ height:`${(1 - splitRatio) * 100}%`, flex:'none' }}

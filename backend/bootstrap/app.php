@@ -13,7 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: ['api/*']);
-        $middleware->alias(['check.not.blocked' => \App\Http\Middleware\CheckNotBlocked::class]);
+        $middleware->alias([
+            'check.not.blocked' => \App\Http\Middleware\CheckNotBlocked::class,
+            'admin'             => \App\Http\Middleware\EnsureUserIsAdmin::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

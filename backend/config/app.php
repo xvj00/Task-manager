@@ -55,6 +55,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | CSP frame-ancestors для отдачи вложений (/api/files/*) во фронт на другом origin.
+    | Пример: http://127.0.0.1:5173 http://localhost:5173 или * для разработки.
+    */
+    'frontend_frame_ancestors' => env('FRONTEND_FRAME_ANCESTORS', '*'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

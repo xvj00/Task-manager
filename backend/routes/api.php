@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
-Route::get ('/files/{filename}', [TaskAttachmentController::class, 'serve']);
+Route::match(['get', 'head', 'options'], '/files/{filename}', [TaskAttachmentController::class, 'serve']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -26,89 +26,93 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('check.not.blocked')->group(function () {
 
-    // Folders
-    Route::get   ('/folders',                              [FolderController::class, 'index']);
-    Route::post  ('/folders',                              [FolderController::class, 'store']);
-    Route::get   ('/folders/{folder}',                     [FolderController::class, 'show']);
-    Route::put   ('/folders/{folder}',                     [FolderController::class, 'update']);
-    Route::delete('/folders/{folder}',                     [FolderController::class, 'destroy']);
-    Route::post  ('/folders/{folder}/invite',              [FolderController::class, 'invite']);
-    Route::delete('/folders/{folder}/members/{user}',      [FolderController::class, 'removeMember']);
+        // Folders
+        Route::get   ('/folders',                              [FolderController::class, 'index']);
+        Route::post  ('/folders',                              [FolderController::class, 'store']);
+        Route::get   ('/folders/{folder}',                     [FolderController::class, 'show']);
+        Route::put   ('/folders/{folder}',                     [FolderController::class, 'update']);
+        Route::delete('/folders/{folder}',                     [FolderController::class, 'destroy']);
+        Route::post  ('/folders/{folder}/invite',              [FolderController::class, 'invite']);
+        Route::delete('/folders/{folder}/members/{user}',      [FolderController::class, 'removeMember']);
 
-    // Projects
-    Route::get   ('/projects',                             [ProjectController::class, 'index']);
-    Route::post  ('/projects',                             [ProjectController::class, 'store']);
-    Route::get   ('/projects/{project}',                   [ProjectController::class, 'show']);
-    Route::put   ('/projects/{project}',                   [ProjectController::class, 'update']);
-    Route::delete('/projects/{project}',                   [ProjectController::class, 'destroy']);
-    Route::post  ('/projects/{project}/invite',            [ProjectController::class, 'invite']);
-    Route::get   ('/projects/{project}/invite-link',       [ProjectController::class, 'inviteLink']);
-    Route::delete('/projects/{project}/invite-link',       [ProjectController::class, 'inviteLink']);
-    Route::post  ('/projects/join/{token}',                [ProjectController::class, 'joinByToken']);
-    Route::delete('/projects/{project}/members/{user}',    [ProjectController::class, 'removeMember']);
-    Route::get   ('/projects/{project}/leaderboard',       [ProjectController::class, 'leaderboard']);
+        // Projects
+        Route::get   ('/projects',                             [ProjectController::class, 'index']);
+        Route::post  ('/projects',                             [ProjectController::class, 'store']);
+        Route::get   ('/projects/{project}',                   [ProjectController::class, 'show']);
+        Route::put   ('/projects/{project}',                   [ProjectController::class, 'update']);
+        Route::delete('/projects/{project}',                   [ProjectController::class, 'destroy']);
+        Route::post  ('/projects/{project}/invite',            [ProjectController::class, 'invite']);
+        Route::get   ('/projects/{project}/invite-link',       [ProjectController::class, 'inviteLink']);
+        Route::delete('/projects/{project}/invite-link',       [ProjectController::class, 'inviteLink']);
+        Route::post  ('/projects/join/{token}',                [ProjectController::class, 'joinByToken']);
+        Route::delete('/projects/{project}/members/{user}',    [ProjectController::class, 'removeMember']);
+        Route::get   ('/projects/{project}/leaderboard',       [ProjectController::class, 'leaderboard']);
 
-    // Tasks
-    Route::get   ('/tasks',                    [TaskController::class, 'index']);
-    Route::post  ('/tasks',                    [TaskController::class, 'store']);
-    Route::get   ('/tasks/{task}',             [TaskController::class, 'show']);
-    Route::put   ('/tasks/{task}',             [TaskController::class, 'update']);
-    Route::delete('/tasks/{task}',             [TaskController::class, 'destroy']);
-    Route::post  ('/tasks/{task}/take',        [TaskController::class, 'take']);
-    Route::post  ('/tasks/{task}/submit',      [TaskController::class, 'submit']);
-    Route::post  ('/tasks/{task}/approve',     [TaskController::class, 'approve']);
-    Route::post  ('/tasks/{task}/reject',      [TaskController::class, 'reject']);
-    Route::post  ('/tasks/{task}/archive',     [TaskController::class, 'archive']);
+        // Tasks
+        Route::get   ('/tasks',                    [TaskController::class, 'index']);
+        Route::post  ('/tasks',                    [TaskController::class, 'store']);
+        Route::get   ('/tasks/{task}',             [TaskController::class, 'show']);
+        Route::put   ('/tasks/{task}',             [TaskController::class, 'update']);
+        Route::delete('/tasks/{task}',             [TaskController::class, 'destroy']);
+        Route::post  ('/tasks/{task}/take',        [TaskController::class, 'take']);
+        Route::post  ('/tasks/{task}/submit',      [TaskController::class, 'submit']);
+        Route::post  ('/tasks/{task}/approve',     [TaskController::class, 'approve']);
+        Route::post  ('/tasks/{task}/reject',      [TaskController::class, 'reject']);
+        Route::post  ('/tasks/{task}/archive',     [TaskController::class, 'archive']);
 
-    // Subtasks
-    Route::post  ('/tasks/{task}/subtasks',                        [SubtaskController::class, 'store']);
-    Route::post  ('/tasks/{task}/subtasks/reorder',                [SubtaskController::class, 'reorder']);
-    Route::put   ('/tasks/{task}/subtasks/{subtask}',              [SubtaskController::class, 'update']);
-    Route::delete('/tasks/{task}/subtasks/{subtask}',              [SubtaskController::class, 'destroy']);
+        // Subtasks
+        Route::post  ('/tasks/{task}/subtasks',                        [SubtaskController::class, 'store']);
+        Route::post  ('/tasks/{task}/subtasks/reorder',                [SubtaskController::class, 'reorder']);
+        Route::put   ('/tasks/{task}/subtasks/{subtask}',              [SubtaskController::class, 'update']);
+        Route::delete('/tasks/{task}/subtasks/{subtask}',              [SubtaskController::class, 'destroy']);
 
-    // Comments
-    Route::post  ('/tasks/{task}/comments',                        [TaskCommentController::class, 'store']);
-    Route::delete('/tasks/{task}/comments/{comment}',              [TaskCommentController::class, 'destroy']);
+        // Comments
+        Route::post  ('/tasks/{task}/comments',                        [TaskCommentController::class, 'store']);
+        Route::delete('/tasks/{task}/comments/{comment}',              [TaskCommentController::class, 'destroy']);
 
-    // Attachments
-    Route::post  ('/tasks/{task}/attachments',                     [TaskAttachmentController::class, 'store']);
-    Route::delete('/tasks/{task}/attachments/{attachment}',        [TaskAttachmentController::class, 'destroy']);
+        // Attachments
+        Route::post  ('/tasks/{task}/attachments',                     [TaskAttachmentController::class, 'store']);
+        Route::delete('/tasks/{task}/attachments/{attachment}',        [TaskAttachmentController::class, 'destroy']);
 
-    // Transactions & Balance
-    Route::get ('/transactions',        [TransactionController::class, 'index']);
-    Route::post('/transactions/manual', [TransactionController::class, 'manual']);
-    Route::get ('/balances',            [TransactionController::class, 'allBalances']);
+        // Transactions (история — всем; ручные операции и свод балансов — только admin)
+        Route::get ('/transactions', [TransactionController::class, 'index']);
 
-    // Prizes
-    Route::get   ('/prizes',                               [PrizeController::class, 'index']);
-    Route::post  ('/prizes',                               [PrizeController::class, 'store']);
-    Route::put   ('/prizes/{prize}',                       [PrizeController::class, 'update']);
-    Route::delete('/prizes/{prize}',                       [PrizeController::class, 'destroy']);
-    Route::post  ('/prizes/{prize}/request',               [PrizeController::class, 'request']);
-    Route::get   ('/prize-requests',                       [PrizeController::class, 'requests']);
-    Route::get   ('/prize-requests/my',                    [PrizeController::class, 'myRequests']);
-    Route::post  ('/prize-requests/{prizeRequest}/handle', [PrizeController::class, 'handleRequest']);
+        // Prizes (витрина и запросы пользователей — всем авторизованным)
+        Route::get   ('/prizes',                               [PrizeController::class, 'index']);
+        Route::post  ('/prizes/{prize}/request',               [PrizeController::class, 'request']);
+        Route::get   ('/prize-requests/my',                    [PrizeController::class, 'myRequests']);
 
-    // Leaderboard
-    Route::get('/leaderboard', [LeaderboardController::class, 'index']);
+        // Leaderboard
+        Route::get('/leaderboard', [LeaderboardController::class, 'index']);
 
-    // Notifications
-    Route::get ('/notifications',           [NotificationController::class, 'index']);
-    Route::post('/notifications/read-all',  [NotificationController::class, 'markAllRead']);
-    Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
+        // Notifications
+        Route::get ('/notifications',           [NotificationController::class, 'index']);
+        Route::post('/notifications/read-all',  [NotificationController::class, 'markAllRead']);
+        Route::post('/notifications/{id}/read', [NotificationController::class, 'markRead']);
 
-    // Invitations
-    Route::get ('/invitations',                    [InvitationController::class, 'index']);
-    Route::post('/invitations/{invitation}/accept',  [InvitationController::class, 'accept']);
-    Route::post('/invitations/{invitation}/decline', [InvitationController::class, 'decline']);
+        // Invitations
+        Route::get ('/invitations',                    [InvitationController::class, 'index']);
+        Route::post('/invitations/{invitation}/accept',  [InvitationController::class, 'accept']);
+        Route::post('/invitations/{invitation}/decline', [InvitationController::class, 'decline']);
 
-    // Admin
-    Route::get ('/admin/stats',              [AdminController::class, 'stats']);
-    Route::get ('/admin/users',              [AdminController::class, 'users']);
-    Route::put ('/admin/users/{user}',       [AdminController::class, 'updateUser']);
-    Route::put ('/admin/users/{user}/block', [AdminController::class, 'blockUser']);
-    Route::put ('/admin/users/{user}/unblock', [AdminController::class, 'unblockUser']);
-    Route::get ('/admin/appeals',            [AdminController::class, 'appeals']);
+        // ── Только администратор (middleware admin) ──
+        Route::middleware('admin')->group(function () {
+            Route::get ('/admin/stats',              [AdminController::class, 'stats']);
+            Route::get ('/admin/users',              [AdminController::class, 'users']);
+            Route::put ('/admin/users/{user}',       [AdminController::class, 'updateUser']);
+            Route::put ('/admin/users/{user}/block', [AdminController::class, 'blockUser']);
+            Route::put ('/admin/users/{user}/unblock', [AdminController::class, 'unblockUser']);
+            Route::get ('/admin/appeals',            [AdminController::class, 'appeals']);
+
+            Route::post('/transactions/manual', [TransactionController::class, 'manual']);
+            Route::get ('/balances',            [TransactionController::class, 'allBalances']);
+
+            Route::post  ('/prizes',                               [PrizeController::class, 'store']);
+            Route::put   ('/prizes/{prize}',                       [PrizeController::class, 'update']);
+            Route::delete('/prizes/{prize}',                       [PrizeController::class, 'destroy']);
+            Route::get   ('/prize-requests',                       [PrizeController::class, 'requests']);
+            Route::post  ('/prize-requests/{prizeRequest}/handle', [PrizeController::class, 'handleRequest']);
+        });
 
     }); // end check.not.blocked
 });

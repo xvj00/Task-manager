@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import useAuthStore from '../../store/authStore';
-import BlockedPage from '../../pages/BlockedPage';
+
+const BlockedPage = lazy(() => import('../../pages/BlockedPage'));
 
 export default function AppLayout() {
   const { token, user, fetchMe } = useAuthStore();
@@ -17,10 +18,12 @@ export default function AppLayout() {
 
   if (user.is_blocked) {
     return (
-      <BlockedPage
-        reason={user.block_reason}
-        appealSubmitted={!!user.appeal_at}
-      />
+      <Suspense fallback={<div className="loading-screen">Загрузка...</div>}>
+        <BlockedPage
+          reason={user.block_reason}
+          appealSubmitted={!!user.appeal_at}
+        />
+      </Suspense>
     );
   }
 

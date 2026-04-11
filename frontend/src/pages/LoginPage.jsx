@@ -61,7 +61,7 @@ export default function LoginPage() {
           <div className="auth-logo-icon">
             <Trophy size={22} color="#fff" />
           </div>
-          <div className="auth-app-name">Artem List</div>
+          <div className="auth-app-name">Таск-менеджер</div>
           <div className="auth-app-sub">Войдите в систему</div>
         </div>
 

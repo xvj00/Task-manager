@@ -27,8 +27,6 @@ class AdminController extends Controller
 
     public function users(Request $request)
     {
-        if (!$request->user()->isAdmin()) abort(403);
-
         return response()->json(
             User::withCount([
                 'tasks as completed_tasks' => fn($q) => $q->where('status', 'done'),
@@ -38,14 +36,12 @@ class AdminController extends Controller
 
     public function updateUser(UpdateUserRequest $request, User $user)
     {
-        if (!$request->user()->isAdmin()) abort(403);
         $user->update($request->validated());
         return response()->json($user);
     }
 
     public function blockUser(Request $request, User $user)
     {
-        if (!$request->user()->isAdmin()) abort(403);
         if ($user->id === $request->user()->id) abort(422, 'Нельзя заблокировать себя.');
         $data = $request->validate([
             'reason' => 'required|string|max:1000',
@@ -58,7 +54,6 @@ class AdminController extends Controller
 
     public function unblockUser(Request $request, User $user)
     {
-        if (!$request->user()->isAdmin()) abort(403);
         $user->update([
             'is_blocked'   => false,
             'block_reason' => null,
@@ -70,7 +65,6 @@ class AdminController extends Controller
 
     public function appeals(Request $request)
     {
-        if (!$request->user()->isAdmin()) abort(403);
         $users = User::whereNotNull('appeal_text')
             ->select('id', 'name', 'username', 'email', 'is_blocked', 'block_reason', 'appeal_text', 'appeal_at', 'created_at')
             ->get();
