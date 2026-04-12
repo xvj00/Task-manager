@@ -19,7 +19,7 @@ export default defineConfig({
     strictPort: false,
   },
   optimizeDeps: {
-    include: ['lucide-react'],
+    include: ['lucide-react', 'react', 'react-dom', 'react-router-dom', 'react-hot-toast', 'axios', 'zustand'],
   },
   build: {
     target: 'es2020',
@@ -32,6 +32,7 @@ export default defineConfig({
           if (id.includes('lucide-react')) return 'icons';
           if (id.includes('react-dom') || id.includes('react-router')) return 'react-vendor';
           if (id.includes('react')) return 'react-core';
+          if (id.includes('axios') || id.includes('zustand')) return 'app-vendor';
         },
       },
     },

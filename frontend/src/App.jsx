@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import AppLayout from './components/layout/AppLayout';
+
+/** Shell с сайдбаром — отдельный чанк: страницы логина/регистрации грузят меньше JS */
+const AppLayout = lazy(() => import('./components/layout/AppLayout'));
 
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));

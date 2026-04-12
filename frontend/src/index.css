@@ -11,7 +11,7 @@
 }
 html,body,#root{height:100%;margin:0;padding:0}
 html{font-size:14px}
-body{font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text1);-webkit-font-smoothing:antialiased}
+body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,'DM Sans',sans-serif;background:var(--bg);color:var(--text1);-webkit-font-smoothing:antialiased}
 a{text-decoration:none;color:inherit}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
@@ -27,7 +27,8 @@ a{text-decoration:none;color:inherit}
 .logo{padding:0 16px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid var(--border);margin-bottom:8px}
 .logo-text{font-size:15px;font-weight:500;color:var(--text1);display:flex;align-items:center;gap:8px}
 .logo-icon{width:28px;height:28px;background:var(--indigo);border-radius:var(--r);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.bell-btn{position:relative;background:none;border:none;cursor:pointer;padding:4px;color:var(--text2);display:flex;align-items:center;border-radius:var(--r);transition:all .15s}
+.bell-btn{position:relative;background:none;border:none;cursor:pointer;padding:4px;color:var(--text2);display:flex;align-items:center;border-radius:var(--r);transition:background .15s,color .15s}
+.bell-btn--placeholder{min-width:34px;min-height:34px;pointer-events:none}
 .bell-btn:hover{background:var(--surface2);color:var(--text1)}
 .bell-badge{position:absolute;top:-1px;right:-1px;width:14px;height:14px;background:var(--rose);border-radius:50%;border:2px solid var(--surface);font-size:9px;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500}
 .nav{flex:1;padding:0 8px}
@@ -479,4 +480,9 @@ textarea.form-input{resize:vertical;min-height:80px}
   .auth-wrap{width:100%;max-width:400px}
   .blocked-card{padding:24px 18px}
   .leaderboard-row{flex-wrap:wrap;gap:8px}
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .sidebar{transition:none}
 }

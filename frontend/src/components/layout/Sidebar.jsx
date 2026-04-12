@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   House, Folder, LayoutDashboard, ClipboardList, Gift,
   Settings2, LogOut, Coins, Trophy, Menu, X,
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
-import NotificationsBell from '../common/NotificationsBell';
+
+const NotificationsBell = lazy(() => import('../common/NotificationsBell'));
 
 const NAV = [
   { path: '/',         Icon: House,           label: 'Главная',        end: true },
@@ -18,17 +19,12 @@ const NAV = [
 export default function Sidebar() {
   const { user, logout, fetchMe } = useAuthStore();
   const navigate = useNavigate();
-  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const iv = setInterval(() => { fetchMe().catch(() => {}); }, 60000);
     return () => clearInterval(iv);
   }, []);
-
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
 
   const handleLogout = async () => { await logout(); navigate('/login'); };
   const initials = user?.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
@@ -67,7 +63,9 @@ export default function Sidebar() {
             >
               <X size={18} />
             </button>
-            <NotificationsBell />
+            <Suspense fallback={<span className="bell-btn bell-btn--placeholder" aria-hidden />}>
+              <NotificationsBell />
+            </Suspense>
           </div>
         </div>
 

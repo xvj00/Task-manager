@@ -271,7 +271,10 @@ export default function TaskDetailPage() {
       api.get(`/projects/${r.data.project_id}`).then(pr => setProject(pr.data)).catch(() => {});
     }
   };
-  useEffect(() => { load(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- перезагрузка только при смене id
+  }, [id]);
 
   useEffect(() => {
     const onResize = () => setViewportW(window.innerWidth);

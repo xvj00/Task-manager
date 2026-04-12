@@ -37,7 +37,6 @@ class TaskController extends Controller
                   });
             });
         }
-
         if ($request->filled('status'))   $query->where('status', $request->status);
         if ($request->filled('priority')) $query->where('priority', $request->priority);
         if ($request->filled('assignee_id')) $query->where('assignee_id', $request->assignee_id);

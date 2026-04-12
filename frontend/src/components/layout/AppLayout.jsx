@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import useAuthStore from '../../store/authStore';
 
@@ -8,6 +8,7 @@ const BlockedPage = lazy(() => import('../../pages/BlockedPage'));
 export default function AppLayout() {
   const { token, user, fetchMe } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!token) { navigate('/login'); return; }
@@ -29,7 +30,7 @@ export default function AppLayout() {
 
   return (
     <div className="app">
-      <Sidebar />
+      <Sidebar key={location.pathname} />
       <div className="main">
         <div className="screen">
           <Outlet />

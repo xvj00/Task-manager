@@ -17,7 +17,6 @@ class EnsureUserIsAdmin
                 'message' => 'Доступ только для администратора.',
             ], 403);
         }
-
         return $next($request);
     }
 }

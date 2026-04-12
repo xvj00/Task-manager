@@ -20,9 +20,21 @@ export default function DashboardPage() {
   const [stats, setStats]   = useState(null);
 
   useEffect(() => {
-    api.get('/tasks').then(r => setTasks(r.data)).catch(() => {});
-    if (isAdmin) api.get('/admin/stats').then(r => setStats(r.data)).catch(() => {});
-  }, [user]);
+    let cancelled = false;
+    (async () => {
+      try {
+        const tasksP = api.get('/tasks');
+        const statsP = isAdmin ? api.get('/admin/stats') : Promise.resolve({ data: null });
+        const [tasksRes, statsRes] = await Promise.all([tasksP, statsP]);
+        if (cancelled) return;
+        setTasks(tasksRes.data);
+        if (isAdmin && statsRes.data) setStats(statsRes.data);
+      } catch {
+        if (!cancelled) setTasks([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAdmin]);
 
   const reviewTasks = tasks.filter(t => t.status === 'review');
   const myTasks     = tasks.filter(t => t.assignee_id === user?.id);
